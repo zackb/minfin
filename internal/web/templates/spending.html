@@ -1,0 +1,64 @@
+{{define "content"}}
+<h1>Spending</h1>
+<div class="card chart-card">
+  <form method="get" action="/" class="controls">
+    <select name="range" onchange="this.form.submit()">
+      {{$r := .Range}}{{range .RangeOptions}}
+      <option value="{{.Key}}" {{if eq .Key $r}}selected{{end}}>{{.Label}}</option>
+      {{end}}
+    </select>
+    <select name="interval" onchange="this.form.submit()">
+      {{$i := .Interval}}{{range .IntervalOptions}}
+      <option value="{{.}}" {{if eq . $i}}selected{{end}}>{{.}}</option>
+      {{end}}
+    </select>
+    <label class="chk">
+      <input type="checkbox" name="split" value="1" {{if .Split}}checked{{end}}
+        onchange="this.form.submit()"> per-account
+    </label>
+  </form>
+  <div class="chart-wrap"><canvas id="chart"></canvas></div>
+</div>
+
+<div class="card">
+  <h2>Top Vendors · {{.RangeLabel}}</h2>
+  {{if .Payees}}
+  <table>
+    <tr><th>Vendor</th><th class="num">Txns</th><th class="num">Spent</th></tr>
+    {{range .Payees}}
+    <tr><td>{{.Payee}}</td><td class="num">{{.Count}}</td>
+      <td class="num">${{printf "%.2f" .Spent}}</td></tr>
+    {{end}}
+  </table>
+  {{else}}<p class="muted">No spending in this range.</p>{{end}}
+</div>
+
+<script>
+  const series = {{.ChartJSON}};
+  const palette = ['#26c6da','#7e57c2','#66bb6a','#ffa726','#ef5350','#42a5f5','#ec407a','#26a69a'];
+  const datasets = series.lines.map((l, i) => {
+    const c = palette[i % palette.length];
+    return {
+      label: l.name, data: l.values, borderColor: c,
+      backgroundColor: c + '33', borderWidth: 2, tension: .35,
+      fill: series.lines.length === 1, pointRadius: 0, pointHoverRadius: 4,
+    };
+  });
+  new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: { labels: series.labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: series.lines.length > 1, labels: { color: '#9aa0a6' } },
+        tooltip: { callbacks: { label: c => c.dataset.label + ': $' + c.parsed.y.toFixed(2) } },
+      },
+      scales: {
+        x: { grid: { color: '#2a2a2a' }, ticks: { color: '#9aa0a6', maxRotation: 0, autoSkip: true } },
+        y: { grid: { color: '#2a2a2a' }, ticks: { color: '#9aa0a6', callback: v => '$' + v } },
+      },
+    },
+  });
+</script>
+{{end}}

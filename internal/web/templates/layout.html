@@ -1,0 +1,120 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>minfin</title>
+<script src="/static/chart.umd.min.js"></script>
+<script>
+  // Apply collapsed state before paint to avoid flash.
+  if (localStorage.getItem('minfin-nav') === 'collapsed')
+    document.documentElement.classList.add('nav-collapsed');
+</script>
+<style>
+  :root{
+    --bg:#121212; --surface:#1e1e1e; --surface2:#262626;
+    --line:#2a2a2a; --text:#e8e8e8; --muted:#9aa0a6;
+    --accent:#26c6da; --accent2:#7e57c2; --pos:#66bb6a; --neg:#ef5350;
+    --nav-w:220px; --nav-w-collapsed:64px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex}
+
+  /* Sidebar */
+  .sidebar{width:var(--nav-w);flex:0 0 var(--nav-w);background:var(--surface);
+    border-right:1px solid var(--line);display:flex;flex-direction:column;
+    padding:.75rem .6rem;gap:.25rem;transition:width .15s,flex-basis .15s;
+    height:100vh;position:sticky;top:0}
+  html.nav-collapsed .sidebar{width:var(--nav-w-collapsed);flex-basis:var(--nav-w-collapsed)}
+  html.nav-collapsed .lbl{display:none}
+  .brand{display:flex;align-items:center;gap:.6rem;padding:.4rem .5rem 1rem}
+  .brand .name{font-weight:600;letter-spacing:.5px}
+  .navbtn{background:none;border:none;color:var(--text);cursor:pointer;
+    font-size:1.2rem;padding:.3rem .5rem;border-radius:8px;line-height:1}
+  .navbtn:hover{background:var(--surface2)}
+  .sidebar nav{display:flex;flex-direction:column;gap:.25rem;flex:1}
+  .sidebar a{display:flex;align-items:center;gap:.85rem;padding:.6rem .65rem;
+    border-radius:10px;color:var(--muted);text-decoration:none;white-space:nowrap;
+    overflow:hidden}
+  .sidebar a:hover{background:var(--surface2);color:var(--text)}
+  .sidebar a.active{background:var(--surface2);color:var(--accent)}
+  .sidebar a .ico{font-size:1.15rem;width:1.3rem;text-align:center;flex:0 0 1.3rem}
+  .sync-form button{display:flex;align-items:center;gap:.85rem;width:100%;
+    background:var(--surface2);color:var(--text);border:1px solid var(--line);
+    border-radius:10px;padding:.6rem .65rem;cursor:pointer;white-space:nowrap}
+
+  /* Content */
+  .content{flex:1;min-width:0;padding:1.5rem;overflow-x:hidden}
+  h1{font-size:1.4rem;margin:0 0 1.25rem;font-weight:600}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:1.25rem;margin-bottom:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+  .chart-card{padding:1rem 1.25rem}
+  .chart-wrap{position:relative;height:60vh;min-height:340px}
+  form.controls{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center}
+  select,button{background:var(--surface2);color:var(--text);border:1px solid var(--line);
+    border-radius:8px;padding:.5rem .75rem;font-size:.95rem}
+  button{cursor:pointer}
+  button.primary{background:var(--accent);color:#06303a;border:none;font-weight:600}
+  label.chk{display:flex;align-items:center;gap:.4rem;color:var(--muted)}
+  input[type=text]{background:var(--surface2);color:var(--text);border:1px solid var(--line);
+    border-radius:8px;padding:.6rem;min-width:340px}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:.6rem .75rem;border-bottom:1px solid var(--line)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  th{color:var(--muted);font-weight:500;font-size:.85rem;text-transform:uppercase;letter-spacing:.5px}
+  h2{font-size:1rem;color:var(--muted);font-weight:500;margin:0 0 1rem;
+    text-transform:uppercase;letter-spacing:.5px}
+  .err{color:#ff8a80;background:#2a1414;padding:.6rem .9rem;border-radius:8px;margin:0 0 1rem}
+  .muted{color:var(--muted)}
+  .pos{color:var(--pos)} .neg{color:var(--neg)}
+  a.link{color:var(--accent)}
+  .summary{display:flex;gap:2rem;flex-wrap:wrap;align-items:baseline}
+  .summary .big{font-size:2rem;font-weight:600;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="brand">
+    <button class="navbtn" id="navToggle" title="Toggle navigation">☰</button>
+    <span class="name lbl">minfin</span>
+  </div>
+  <nav>
+    <a href="/" class="{{if eq .Active "spending"}}active{{end}}"><span class="ico">📈</span><span class="lbl">Spending</span></a>
+    <a href="/accounts" class="{{if eq .Active "accounts"}}active{{end}}"><span class="ico">🏦</span><span class="lbl">Accounts</span></a>
+    <a href="/transactions" class="{{if eq .Active "transactions"}}active{{end}}"><span class="ico">≣</span><span class="lbl">Transactions</span></a>
+  </nav>
+  {{if .Connected}}
+  <form method="post" action="/sync" class="sync-form">
+    <button type="submit"><span class="ico">↻</span><span class="lbl">Sync</span></button>
+  </form>
+  {{end}}
+</aside>
+
+<div class="content">
+  {{if .Error}}<div class="err">{{.Error}}</div>{{end}}
+  {{if .Connected}}{{template "content" .}}{{else}}{{template "setup" .}}{{end}}
+</div>
+
+<script>
+  document.getElementById('navToggle').addEventListener('click', function () {
+    var collapsed = document.documentElement.classList.toggle('nav-collapsed');
+    localStorage.setItem('minfin-nav', collapsed ? 'collapsed' : 'open');
+  });
+</script>
+</body>
+</html>{{end}}
+
+{{define "setup"}}
+<h1>Connect SimpleFIN</h1>
+<div class="card">
+  <p class="muted">Paste a setup token from
+    <a class="link" href="https://bridge.simplefin.org">bridge.simplefin.org</a>
+    to start syncing.</p>
+  <form method="post" action="/setup" class="controls">
+    <input type="text" name="token" placeholder="setup token (base64)" required>
+    <button type="submit" class="primary">Connect</button>
+  </form>
+</div>
+{{end}}

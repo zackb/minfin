@@ -1,4 +1,4 @@
-package main
+package simplefin
 
 import (
 	"encoding/base64"
@@ -21,7 +21,6 @@ func TestClaimAndFetch(t *testing.T) {
 	  }]
 	}`
 
-	// /claim returns an access URL pointing at /accounts on the same server.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/claim":
@@ -34,13 +33,11 @@ func TestClaimAndFetch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// Claim: a setup token is base64 of the claim URL.
 	token := base64.StdEncoding.EncodeToString([]byte(srv.URL + "/claim"))
 	if _, err := Claim(token); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
 
-	// Fetch against the test server's base URL.
 	set, err := Fetch(srv.URL, 0)
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
@@ -54,8 +51,5 @@ func TestClaimAndFetch(t *testing.T) {
 	}
 	if len(a.Transactions) != 1 || a.Transactions[0].Amount != "-12.34" {
 		t.Fatalf("bad txn parse: %+v", a.Transactions)
-	}
-	if got := a.Transactions[0].PostedTime(); got == "" {
-		t.Fatalf("PostedTime empty")
 	}
 }

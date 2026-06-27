@@ -1,4 +1,6 @@
-package main
+// Package simplefin is a minimal client for the SimpleFIN protocol:
+// https://www.simplefin.org/protocol.html
+package simplefin
 
 import (
 	"encoding/base64"
@@ -11,8 +13,6 @@ import (
 	"strings"
 	"time"
 )
-
-// SimpleFIN protocol: https://www.simplefin.org/protocol.html
 
 type AccountSet struct {
 	Errors   []string  `json:"errors"`
@@ -40,14 +40,6 @@ type Transaction struct {
 	Payee       string `json:"payee"`
 	Memo        string `json:"memo"`
 	Pending     bool   `json:"pending"`
-}
-
-// PostedTime renders the posted epoch as a date (used by templates).
-func (t Transaction) PostedTime() string {
-	if t.Posted == 0 {
-		return ""
-	}
-	return time.Unix(t.Posted, 0).Format("2006-01-02")
 }
 
 // Claim trades a base64 setup token for a long-lived access URL.

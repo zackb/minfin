@@ -1,0 +1,67 @@
+{{define "content"}}
+<h1>Transactions</h1>
+
+<style>
+  .filters{display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end}
+  .filters .f{display:flex;flex-direction:column;gap:.25rem}
+  .filters label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .filters input,.filters select{background:var(--surface2);color:var(--text);
+    border:1px solid var(--line);border-radius:8px;padding:.5rem .6rem;font-size:.95rem}
+  .badge{font-size:.7rem;color:#ffd180;border:1px solid #5d4b1f;background:#2a230f;
+    border-radius:6px;padding:.05rem .4rem;margin-left:.4rem;vertical-align:middle}
+  .pager{display:flex;gap:.75rem;align-items:center;margin-top:1rem}
+  .pager a{color:var(--accent);text-decoration:none;border:1px solid var(--line);
+    border-radius:8px;padding:.4rem .8rem}
+  .pager span.disabled{color:var(--muted);border:1px solid var(--line);
+    border-radius:8px;padding:.4rem .8rem;opacity:.5}
+  .desc{color:var(--muted);font-size:.85rem}
+</style>
+
+<div class="card">
+  <form method="get" action="/transactions" class="filters">
+    <div class="f"><label>From</label><input type="date" name="from" value="{{.From}}"></div>
+    <div class="f"><label>To</label><input type="date" name="to" value="{{.To}}"></div>
+    <div class="f"><label>Account</label>
+      <select name="account">
+        <option value="">All accounts</option>
+        {{$a := .AccountID}}{{range .Accounts}}
+        <option value="{{.ID}}" {{if eq .ID $a}}selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div class="f"><label>Type</label>
+      <select name="dir">
+        {{$d := .Direction}}
+        <option value="all" {{if eq $d "all"}}selected{{end}}>All</option>
+        <option value="debit" {{if eq $d "debit"}}selected{{end}}>Debits</option>
+        <option value="credit" {{if eq $d "credit"}}selected{{end}}>Credits</option>
+      </select>
+    </div>
+    <div class="f"><label>Search</label><input type="text" name="q" value="{{.Query}}" placeholder="payee or description"></div>
+    <button type="submit" class="primary">Filter</button>
+  </form>
+</div>
+
+<div class="card">
+  {{if .Rows}}
+  <table>
+    <tr><th>Date</th><th>Account</th><th>Payee</th><th class="num">Amount</th></tr>
+    {{range .Rows}}
+    <tr>
+      <td>{{.Posted.Format "2006-01-02"}}</td>
+      <td class="muted">{{.Account}}</td>
+      <td>{{.Payee}}{{if .Pending}}<span class="badge">pending</span>{{end}}
+        {{if and .Description (ne .Description .Payee)}}<div class="desc">{{.Description}}</div>{{end}}</td>
+      <td class="num {{if lt .Amount 0.0}}neg{{else}}pos{{end}}">{{money .Amount}}</td>
+    </tr>
+    {{end}}
+  </table>
+  {{else}}<p class="muted">No transactions match these filters.</p>{{end}}
+
+  <div class="pager">
+    {{if .PrevURL}}<a href="{{.PrevURL}}">← Prev</a>{{else}}<span class="disabled">← Prev</span>{{end}}
+    <span class="muted">Page {{.Page}}</span>
+    {{if .NextURL}}<a href="{{.NextURL}}">Next →</a>{{else}}<span class="disabled">Next →</span>{{end}}
+  </div>
+</div>
+{{end}}
