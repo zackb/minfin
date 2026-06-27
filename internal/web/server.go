@@ -4,10 +4,10 @@ package web
 
 import (
 	"embed"
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/zackb/minfin/internal/simplefin"
@@ -51,14 +51,28 @@ func NewServer(s *store.Store) *Server {
 
 func (s *Server) Handler() http.Handler { return s.mux }
 
-// money formats signed dollars as -$12.34 / $12.34 (keeps the $ left of the sign).
-var funcs = template.FuncMap{
-	"money": func(d float64) string {
-		if d < 0 {
-			return fmt.Sprintf("-$%.2f", -d)
+var funcs = template.FuncMap{"money": money}
+
+// money formats signed dollars US-style with thousands separators, keeping the
+// $ left of the sign: 1234.5 -> "$1,234.50", -1234.56 -> "-$1,234.56".
+func money(d float64) string {
+	neg := d < 0
+	if neg {
+		d = -d
+	}
+	intPart, frac, _ := strings.Cut(strconv.FormatFloat(d, 'f', 2, 64), ".")
+	var b strings.Builder
+	for i := 0; i < len(intPart); i++ {
+		if i > 0 && (len(intPart)-i)%3 == 0 {
+			b.WriteByte(',')
 		}
-		return fmt.Sprintf("$%.2f", d)
-	},
+		b.WriteByte(intPart[i])
+	}
+	out := "$" + b.String() + "." + frac
+	if neg {
+		out = "-" + out
+	}
+	return out
 }
 
 func page(name string) *template.Template {
@@ -71,11 +85,34 @@ type viewBase struct {
 	Active    string // "spending" | "accounts" | "transactions"
 	Connected bool
 	Error     string
+	Notices   []string // SimpleFIN connection warnings from the last sync
+	LastSync  string   // human-readable time of last sync, "" if never
 }
 
 func (s *Server) accessURL() string {
 	u, _ := s.store.AccessURL()
 	return u
+}
+
+// base builds the per-page layout fields, including the last sync time and any
+// account-health notices from SimpleFIN.
+func (s *Server) base(active string) viewBase {
+	b := viewBase{Active: active, Connected: s.accessURL() != ""}
+	st, err := s.store.SyncStatus()
+	if err != nil {
+		return b
+	}
+	if !st.At.IsZero() {
+		b.LastSync = st.At.Format("Jan 2 3:04 PM")
+	}
+	for _, e := range st.Errors {
+		// Skip our own query-window advisories; surface real account issues.
+		if strings.HasPrefix(e, "Requested date range") {
+			continue
+		}
+		b.Notices = append(b.Notices, e)
+	}
+	return b
 }
 
 func (s *Server) render(w http.ResponseWriter, name string, v any) {

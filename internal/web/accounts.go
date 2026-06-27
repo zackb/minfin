@@ -14,7 +14,7 @@ type accountsView struct {
 }
 
 func (s *Server) handleAccounts(w http.ResponseWriter, r *http.Request) {
-	v := accountsView{viewBase: viewBase{Active: "accounts", Connected: s.accessURL() != ""}}
+	v := accountsView{viewBase: s.base("accounts")}
 	if v.Connected {
 		accts, err := s.store.Accounts(time.Now())
 		if err != nil {

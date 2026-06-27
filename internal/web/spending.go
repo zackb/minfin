@@ -29,7 +29,7 @@ func (s *Server) handleSpending(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	v := spendingView{
-		viewBase:        viewBase{Active: "spending", Connected: s.accessURL() != ""},
+		viewBase:        s.base("spending"),
 		Range:           orDefault(q.Get("range"), "last-30-days"),
 		Interval:        orDefault(q.Get("interval"), "daily"),
 		Split:           q.Get("split") == "1",

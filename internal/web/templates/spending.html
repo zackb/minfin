@@ -27,7 +27,7 @@
     <tr><th>Vendor</th><th class="num">Txns</th><th class="num">Spent</th></tr>
     {{range .Payees}}
     <tr><td>{{.Payee}}</td><td class="num">{{.Count}}</td>
-      <td class="num">${{printf "%.2f" .Spent}}</td></tr>
+      <td class="num">{{money .Spent}}</td></tr>
     {{end}}
   </table>
   {{else}}<p class="muted">No spending in this range.</p>{{end}}
@@ -52,11 +52,11 @@
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: series.lines.length > 1, labels: { color: '#9aa0a6' } },
-        tooltip: { callbacks: { label: c => c.dataset.label + ': $' + c.parsed.y.toFixed(2) } },
+        tooltip: { callbacks: { label: c => c.dataset.label + ': $' + c.parsed.y.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } },
       },
       scales: {
         x: { grid: { color: '#2a2a2a' }, ticks: { color: '#9aa0a6', maxRotation: 0, autoSkip: true } },
-        y: { grid: { color: '#2a2a2a' }, ticks: { color: '#9aa0a6', callback: v => '$' + v } },
+        y: { grid: { color: '#2a2a2a' }, ticks: { color: '#9aa0a6', callback: v => '$' + v.toLocaleString('en-US') } },
       },
     },
   });

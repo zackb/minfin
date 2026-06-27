@@ -9,17 +9,24 @@ import (
 	"github.com/zackb/minfin/internal/store"
 )
 
-// LookbackDays is how far back each sync pulls. Dedup by txn id makes a wide
-// window idempotent.
-// ponytail: fixed 2y lookback per sync; make incremental (track last posted) if
-// the bridge caps response size.
-const LookbackDays = 730
+// LookbackDays is how far back each sync pulls. The SimpleFIN Bridge hard-caps a
+// request at 90 days (and recommends 45), so 89 maximizes history without
+// tripping the "was capped" error. Deeper history still accumulates across
+// repeated syncs since we dedup by txn id and never delete.
+const LookbackDays = 89
 
-// Sync pulls accounts+transactions from SimpleFIN into the store.
+// Sync pulls accounts+transactions from SimpleFIN into the store and records the
+// reported errors so the UI can surface connection problems.
 func Sync(s *store.Store, accessURL string) error {
 	set, err := simplefin.Fetch(accessURL, LookbackDays)
 	if err != nil {
 		return err
+	}
+	for _, e := range set.Errors {
+		log.Printf("simplefin: %s", e)
+	}
+	if err := s.SetSyncStatus(store.SyncStatus{At: time.Now(), Errors: set.Errors}); err != nil {
+		log.Printf("save sync status: %v", err)
 	}
 	return s.SaveAccountSet(set)
 }

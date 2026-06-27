@@ -67,6 +67,9 @@
   h2{font-size:1rem;color:var(--muted);font-weight:500;margin:0 0 1rem;
     text-transform:uppercase;letter-spacing:.5px}
   .err{color:#ff8a80;background:#2a1414;padding:.6rem .9rem;border-radius:8px;margin:0 0 1rem}
+  .notice{color:#ffd180;background:#2a230f;border:1px solid #5d4b1f;
+    padding:.6rem .9rem;border-radius:8px;margin:0 0 .75rem}
+  .synced{font-size:.75rem;padding:.4rem .65rem}
   .muted{color:var(--muted)}
   .pos{color:var(--pos)} .neg{color:var(--neg)}
   a.link{color:var(--accent)}
@@ -89,10 +92,12 @@
   <form method="post" action="/sync" class="sync-form">
     <button type="submit"><span class="ico">↻</span><span class="lbl">Sync</span></button>
   </form>
+  {{if .LastSync}}<div class="synced lbl muted">Synced {{.LastSync}}</div>{{end}}
   {{end}}
 </aside>
 
 <div class="content">
+  {{range .Notices}}<div class="notice">⚠ {{.}}</div>{{end}}
   {{if .Error}}<div class="err">{{.Error}}</div>{{end}}
   {{if .Connected}}{{template "content" .}}{{else}}{{template "setup" .}}{{end}}
 </div>

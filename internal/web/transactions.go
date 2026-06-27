@@ -29,7 +29,7 @@ type transactionsView struct {
 func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	v := transactionsView{
-		viewBase:  viewBase{Active: "transactions", Connected: s.accessURL() != ""},
+		viewBase:  s.base("transactions"),
 		AccountID: q.Get("account"),
 		Direction: orDefault(q.Get("dir"), "all"),
 		Query:     q.Get("q"),
