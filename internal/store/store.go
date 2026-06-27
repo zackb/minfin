@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/zackb/minfin/internal/simplefin"
 	_ "modernc.org/sqlite"
@@ -43,6 +44,12 @@ func Open(path string) (*Store, error) {
 	if _, err := db.Exec(schema); err != nil {
 		return nil, fmt.Errorf("schema: %w", err)
 	}
+	// ponytail: one-shot ALTER, no migration framework. Idempotent: ignore the
+	// "duplicate column name" error on DBs that already have the column.
+	if _, err := db.Exec(`ALTER TABLE accounts ADD COLUMN type TEXT NOT NULL DEFAULT ''`); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column name") {
+		return nil, fmt.Errorf("migrate type: %w", err)
+	}
 	return &Store{db}, nil
 }
 
@@ -73,9 +80,13 @@ func (s *Store) SaveAccountSet(set simplefin.AccountSet) error {
 	defer tx.Rollback()
 	for _, a := range set.Accounts {
 		bal, _ := parseCents(a.Balance)
+		// Upsert, preserving the user-set type column on existing accounts.
 		if _, err := tx.Exec(
-			`INSERT OR REPLACE INTO accounts(id,org_name,name,currency,balance_cents,balance_date)
-			 VALUES(?,?,?,?,?,?)`,
+			`INSERT INTO accounts(id,org_name,name,currency,balance_cents,balance_date)
+			 VALUES(?,?,?,?,?,?)
+			 ON CONFLICT(id) DO UPDATE SET org_name=excluded.org_name, name=excluded.name,
+			   currency=excluded.currency, balance_cents=excluded.balance_cents,
+			   balance_date=excluded.balance_date`,
 			a.ID, a.Org.Name, a.Name, a.Currency, bal, a.BalanceDate); err != nil {
 			return err
 		}

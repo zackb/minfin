@@ -8,6 +8,14 @@
       <div class="big {{if lt .NetWorth 0.0}}neg{{else}}pos{{end}}">{{money .NetWorth}}</div>
     </div>
     <div>
+      <div class="muted">Assets</div>
+      <div class="big pos">{{money .Assets}}</div>
+    </div>
+    <div>
+      <div class="muted">Liabilities</div>
+      <div class="big neg">{{money .Liabilities}}</div>
+    </div>
+    <div>
       <div class="muted">Accounts</div>
       <div class="big">{{len .Accounts}}</div>
     </div>
@@ -18,16 +26,28 @@
   {{if .Accounts}}
   <table>
     <tr>
-      <th>Institution</th><th>Account</th>
+      <th>Institution</th><th>Account</th><th>Type</th>
       <th class="num">Balance</th>
       <th class="num">Spent (30d)</th>
       <th class="num">Txns</th>
       <th>Last Activity</th>
     </tr>
+    {{$types := .Types}}
     {{range .Accounts}}
     <tr>
       <td>{{.Org}}</td>
       <td>{{.Name}} <span class="muted">{{.Currency}}</span></td>
+      <td>
+        <form method="post" action="/accounts/type">
+          <input type="hidden" name="id" value="{{.ID}}">
+          <select name="type" onchange="this.form.submit()">
+            <option value="" {{if eq .Type ""}}selected{{end}}>Uncategorized</option>
+            {{$cur := .Type}}{{range $types}}
+            <option value="{{.Key}}" {{if eq .Key $cur}}selected{{end}}>{{.Label}}</option>
+            {{end}}
+          </select>
+        </form>
+      </td>
       <td class="num {{if lt .Balance 0.0}}neg{{else}}pos{{end}}">{{money .Balance}}</td>
       <td class="num">{{money .Spent30}}</td>
       <td class="num">{{.TxnCount}}</td>

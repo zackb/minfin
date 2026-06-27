@@ -3,20 +3,23 @@ package store
 import "time"
 
 type AccountInfo struct {
-	Org      string
-	Name     string
-	Currency string
-	Balance  float64 // dollars
-	TxnCount int
-	LastTxn  string  // YYYY-MM-DD, "" if none
-	Spent30  float64 // debit spend in last 30 days, dollars
+	ID        string
+	Org       string
+	Name      string
+	Currency  string
+	Type      string  // account type key, "" if uncategorized
+	Liability bool    // counts against net worth
+	Balance   float64 // dollars
+	TxnCount  int
+	LastTxn   string  // YYYY-MM-DD, "" if none
+	Spent30   float64 // debit spend in last 30 days, dollars
 }
 
 // Accounts lists every connected account with balance and activity stats.
 func (s *Store) Accounts(now time.Time) ([]AccountInfo, error) {
 	cut := now.AddDate(0, 0, -30).Unix()
 	rows, err := s.db.Query(`
-		SELECT a.org_name, a.name, a.currency, a.balance_cents,
+		SELECT a.id, a.org_name, a.name, a.currency, a.type, a.balance_cents,
 		       COUNT(t.id),
 		       COALESCE(MAX(t.posted), 0),
 		       -COALESCE(SUM(CASE WHEN t.amount_cents < 0 AND t.posted >= ? THEN t.amount_cents ELSE 0 END), 0)
@@ -31,9 +34,10 @@ func (s *Store) Accounts(now time.Time) ([]AccountInfo, error) {
 	for rows.Next() {
 		var a AccountInfo
 		var balCents, lastPosted, spentCents int64
-		if err := rows.Scan(&a.Org, &a.Name, &a.Currency, &balCents, &a.TxnCount, &lastPosted, &spentCents); err != nil {
+		if err := rows.Scan(&a.ID, &a.Org, &a.Name, &a.Currency, &a.Type, &balCents, &a.TxnCount, &lastPosted, &spentCents); err != nil {
 			return nil, err
 		}
+		a.Liability = Classify(a.Type, balCents)
 		a.Balance = float64(balCents) / 100
 		a.Spent30 = float64(spentCents) / 100
 		if lastPosted > 0 {
@@ -42,6 +46,12 @@ func (s *Store) Accounts(now time.Time) ([]AccountInfo, error) {
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+// SetAccountType assigns a category to an account.
+func (s *Store) SetAccountType(id, typ string) error {
+	_, err := s.db.Exec(`UPDATE accounts SET type=? WHERE id=?`, typ, id)
+	return err
 }
 
 // AccountRef is the minimal account identity used to populate filter dropdowns.

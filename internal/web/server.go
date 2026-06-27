@@ -43,6 +43,7 @@ func NewServer(s *store.Store) *Server {
 	srv.mux.Handle("/static/", http.FileServerFS(staticFS))
 	srv.mux.HandleFunc("/", srv.handleSpending)
 	srv.mux.HandleFunc("/accounts", srv.handleAccounts)
+	srv.mux.HandleFunc("/accounts/type", srv.handleAccountType)
 	srv.mux.HandleFunc("/transactions", srv.handleTransactions)
 	srv.mux.HandleFunc("/setup", srv.handleSetup)
 	srv.mux.HandleFunc("/sync", srv.handleSync)
