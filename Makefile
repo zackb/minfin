@@ -9,6 +9,9 @@ test:
 run:
 	go run ./cmd/minfin
 
+demo: build
+	MINFIN_DB=demo.db ./bin/minfin
+
 fmt:
 	go fmt ./...
 
