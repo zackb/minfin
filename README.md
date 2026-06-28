@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="minfin" width="200">
+</p>
+
 # minfin
 
 A personal finance app I actually want to use. Every other one is bloated,
