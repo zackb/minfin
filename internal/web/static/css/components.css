@@ -163,3 +163,10 @@ th {
 }
 
 .desc { color: var(--muted); font-size: .85rem; }
+
+table a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+table a:hover { border-bottom-color: var(--accent); }

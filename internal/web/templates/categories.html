@@ -16,7 +16,7 @@
   <table>
     <tr><th>Category</th><th class="num">Txns</th><th class="num">Spent</th></tr>
     {{range .Spend}}
-    <tr><td><a href="/transactions?category={{if eq .Category "Uncategorized"}}none{{else}}{{.Category | urlquery}}{{end}}">{{.Category}}</a></td><td class="num">{{.Count}}</td><td class="num">{{money .Amount}}</td></tr>
+    <tr><td><a href="/transactions?from={{$.From}}&to={{$.To}}&category={{if eq .Category "Uncategorized"}}none{{else}}{{.Category | urlquery}}{{end}}">{{.Category}}</a></td><td class="num">{{.Count}}</td><td class="num">{{money .Amount}}</td></tr>
     {{end}}
   </table>
   {{else}}<p class="muted">No spending in this range.</p>{{end}}
@@ -103,6 +103,13 @@
       },
       options: {
         responsive: true, maintainAspectRatio: false,
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
+        onClick: (e, els) => {
+          if (!els.length) return;
+          const label = data.labels[els[0].index];
+          const cat = label === 'Uncategorized' ? 'none' : encodeURIComponent(label);
+          window.location = `/transactions?from={{.From}}&to={{.To}}&category=${cat}`;
+        },
         plugins: {
           legend: { position: 'right', labels: { color: '#9aa0a6' } },
           tooltip: { callbacks: { label: c => c.label + ': $' + c.parsed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } },
