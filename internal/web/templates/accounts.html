@@ -26,7 +26,7 @@
   {{if .Accounts}}
   <table>
     <tr>
-      <th>Institution</th><th>Account</th><th>Type</th>
+      <th>Institution</th><th>Account</th><th>Nickname</th><th>Type</th>
       <th class="num">Balance</th>
       <th class="num">Spent (30d)</th>
       <th class="num">Txns</th>
@@ -36,12 +36,19 @@
     {{range .Accounts}}
     <tr>
       <td>{{.Org}}</td>
+      <td>{{.Name}} <span class="muted">{{.Currency}}</span></td>
       <td>
-        {{.Name}} <span class="muted">{{.Currency}}</span>
-        <form method="post" action="/accounts/nickname">
+        <form method="post" action="/accounts/nickname" class="nickform">
           <input type="hidden" name="id" value="{{.ID}}">
-          <input type="text" name="nickname" value="{{.Nickname}}"
-                 placeholder="nickname" onchange="this.form.submit()">
+          {{if .Nickname}}
+          <span class="nicklabel" onclick="this.closest('form').classList.add('editing')">{{.Nickname}}</span>
+          {{else}}
+          <a class="nicklabel" onclick="this.closest('form').classList.add('editing')">Set Nickname</a>
+          {{end}}
+          <span class="nickedit">
+            <input type="text" name="nickname" value="{{.Nickname}}" placeholder="nickname">
+            <button type="submit" title="Save nickname">✓</button>
+          </span>
         </form>
       </td>
       <td>
