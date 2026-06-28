@@ -27,7 +27,6 @@ html.nav-collapsed .lbl {
     align-items: center;
     gap: .6rem;
     padding: .4rem .5rem 1rem;
-    min-height: 3.25rem;
 }
 
 
@@ -58,7 +57,13 @@ html.nav-collapsed .lbl {
     color: var(--text);
     cursor: pointer;
     font-size: 1.2rem;
-    padding: .3rem .5rem;
+    /* Match the logo height so the brand row stays the same size whether or
+       not the logo is showing — keeps the toggle from shifting on collapse. */
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 .5rem;
     border-radius: 8px;
     line-height: 1;
 }
@@ -74,7 +79,7 @@ html.nav-collapsed .lbl {
     flex: 1;
 }
 
-.sidebar a {
+.sidebar nav a {
     display: flex;
     align-items: center;
     gap: .85rem;
@@ -86,17 +91,17 @@ html.nav-collapsed .lbl {
     overflow: hidden;
 }
 
-.sidebar a:hover {
+.sidebar nav a:hover {
     background: var(--surface2);
     color: var(--text);
 }
 
-.sidebar a.active {
+.sidebar nav a.active {
     background: var(--surface2);
     color: var(--accent);
 }
 
-.sidebar a .ico {
+.sidebar nav a .ico {
     font-size: 1.15rem;
     width: 1.3rem;
     text-align: center;
