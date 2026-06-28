@@ -14,16 +14,17 @@ const dateLayout = "2006-01-02"
 
 type transactionsView struct {
 	viewBase
-	From      string // yyyy-mm-dd, for the date inputs
-	To        string
-	AccountID string
-	Direction string
-	Query     string
-	Accounts  []store.AccountRef
-	Rows      []store.TxnRow
-	Page      int
-	PrevURL   string // "" if no previous page
-	NextURL   string // "" if no next page
+	From       string // yyyy-mm-dd, for the date inputs
+	To         string
+	AccountID  string
+	Direction  string
+	Query      string
+	Accounts   []store.AccountRef
+	Categories []store.Category
+	Rows       []store.TxnRow
+	Page       int
+	PrevURL    string // "" if no previous page
+	NextURL    string // "" if no next page
 }
 
 func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
@@ -57,6 +58,11 @@ func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 		v.Error = err.Error()
 	}
 	v.Accounts = accts
+	if cats, err := s.store.Categories(); err != nil {
+		v.Error = err.Error()
+	} else {
+		v.Categories = cats
+	}
 
 	rows, hasNext, err := s.store.Transactions(store.TxnFilter{
 		Start:     start,
@@ -69,6 +75,13 @@ func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		v.Error = err.Error()
+	}
+	// Mark rows whose payee is already covered by a rule, so the "remember"
+	// checkbox reflects real state instead of resetting on every reload.
+	if rules, err := s.store.Rules(); err == nil {
+		for i := range rows {
+			rows[i].Remembered = s.store.RuleMatches(rows[i].Payee, rules)
+		}
 	}
 	v.Rows = rows
 

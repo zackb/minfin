@@ -29,13 +29,32 @@
 <div class="card">
   {{if .Rows}}
   <table>
-    <tr><th>Date</th><th>Account</th><th>Payee</th><th class="num">Amount</th></tr>
+    <tr><th>Date</th><th>Account</th><th>Payee</th><th>Category</th><th class="num">Amount</th></tr>
+    {{$cats := .Categories}}
     {{range .Rows}}
     <tr>
       <td>{{.Posted.Format "2006-01-02"}}</td>
       <td class="muted">{{.Account}}</td>
       <td>{{.Payee}}{{if .Pending}}<span class="badge">pending</span>{{end}}
         {{if and .Description (ne .Description .Payee)}}<div class="desc">{{.Description}}</div>{{end}}</td>
+      <td>
+        <form method="post" action="/transactions/category" class="catform">
+          <input type="hidden" name="id" value="{{.ID}}">
+          <input type="hidden" name="payee" value="{{.Payee}}">
+          <select name="category">
+            <option value="" {{if eq .Category ""}}selected{{end}}>—</option>
+            {{$cur := .Category}}{{range $cats}}
+            <option value="{{.Name}}" {{if eq .Name $cur}}selected{{end}}>{{.Name}}</option>
+            {{end}}
+          </select>
+          {{if .Remembered}}
+          <label class="chk" title="A rule already remembers this payee — manage rules on the Categories page"><input type="checkbox" checked disabled> remembered</label>
+          {{else}}
+          <label class="chk"><input type="checkbox" name="remember" value="1"> remember</label>
+          {{end}}
+          <button type="submit" title="Save category">✓</button>
+        </form>
+      </td>
       <td class="num {{if lt .Amount 0.0}}neg{{else}}pos{{end}}">{{money .Amount}}</td>
     </tr>
     {{end}}

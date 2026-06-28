@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/zackb/minfin/internal/simplefin"
 	_ "modernc.org/sqlite"
@@ -34,6 +35,17 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 CREATE INDEX IF NOT EXISTS idx_txn_posted ON transactions(posted);
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS categories (
+  name TEXT PRIMARY KEY,
+  color TEXT NOT NULL DEFAULT '',
+  exclude INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS category_rules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pattern TEXT NOT NULL,
+  category TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rule_pattern ON category_rules(pattern);
 `
 
 func Open(path string) (*Store, error) {
@@ -44,7 +56,17 @@ func Open(path string) (*Store, error) {
 	if _, err := db.Exec(schema); err != nil {
 		return nil, fmt.Errorf("schema: %w", err)
 	}
-	return &Store{db}, nil
+	// ponytail: one-shot ALTER, no migration framework. Idempotent: ignore the
+	// "duplicate column name" error on DBs that already have the column.
+	if _, err := db.Exec(`ALTER TABLE transactions ADD COLUMN category TEXT NOT NULL DEFAULT ''`); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column name") {
+		return nil, fmt.Errorf("migrate category: %w", err)
+	}
+	s := &Store{db}
+	if err := s.seedCategories(); err != nil {
+		return nil, fmt.Errorf("seed categories: %w", err)
+	}
+	return s, nil
 }
 
 func (s *Store) Close() error { return s.db.Close() }
@@ -93,9 +115,13 @@ func (s *Store) SaveAccountSet(set simplefin.AccountSet) error {
 			if payee == "" {
 				payee = t.Description
 			}
+			// Upsert, preserving the user/auto-set category column on existing rows.
 			if _, err := tx.Exec(
-				`INSERT OR REPLACE INTO transactions(id,account_id,posted,amount_cents,payee,description,pending)
-				 VALUES(?,?,?,?,?,?,?)`,
+				`INSERT INTO transactions(id,account_id,posted,amount_cents,payee,description,pending)
+				 VALUES(?,?,?,?,?,?,?)
+				 ON CONFLICT(id) DO UPDATE SET account_id=excluded.account_id, posted=excluded.posted,
+				   amount_cents=excluded.amount_cents, payee=excluded.payee,
+				   description=excluded.description, pending=excluded.pending`,
 				t.ID, a.ID, t.Posted, amt, payee, t.Description, t.Pending); err != nil {
 				return err
 			}

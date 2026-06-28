@@ -17,12 +17,15 @@ type TxnFilter struct {
 }
 
 type TxnRow struct {
+	ID          string
 	Posted      time.Time
 	Account     string
 	Payee       string
 	Description string
+	Category    string
 	Amount      float64 // signed dollars (negative = debit)
 	Pending     bool
+	Remembered  bool // a saved rule already categorizes this payee (set by the web layer)
 }
 
 // Transactions returns rows matching the filter (newest first) plus hasNext,
@@ -53,8 +56,8 @@ func (s *Store) Transactions(f TxnFilter) (rows []TxnRow, hasNext bool, err erro
 	}
 	args = append(args, limit+1, f.Offset) // +1 to detect a next page
 
-	q := `SELECT t.posted, COALESCE(NULLIF(a.name,''), t.account_id),
-	             t.payee, t.description, t.amount_cents, t.pending
+	q := `SELECT t.id, t.posted, COALESCE(NULLIF(a.name,''), t.account_id),
+	             t.payee, t.description, t.category, t.amount_cents, t.pending
 	      FROM transactions t LEFT JOIN accounts a ON a.id = t.account_id
 	      WHERE ` + strings.Join(where, " AND ") + `
 	      ORDER BY t.posted DESC
@@ -69,7 +72,7 @@ func (s *Store) Transactions(f TxnFilter) (rows []TxnRow, hasNext bool, err erro
 	for res.Next() {
 		var r TxnRow
 		var posted, cents int64
-		if err := res.Scan(&posted, &r.Account, &r.Payee, &r.Description, &cents, &r.Pending); err != nil {
+		if err := res.Scan(&r.ID, &posted, &r.Account, &r.Payee, &r.Description, &r.Category, &cents, &r.Pending); err != nil {
 			return nil, false, err
 		}
 		r.Posted = time.Unix(posted, 0)

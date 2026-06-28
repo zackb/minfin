@@ -1,5 +1,5 @@
 // Package web serves the dashboard: a collapsible-sidebar layout with the
-// Spending, Accounts, and Transactions screens.
+// Spending, Accounts, Transactions, and Categories screens.
 package web
 
 import (
@@ -39,6 +39,7 @@ func NewServer(s *store.Store) *Server {
 			"spending":     page("spending.html"),
 			"accounts":     page("accounts.html"),
 			"transactions": page("transactions.html"),
+			"categories":   page("categories.html"),
 		},
 	}
 	srv.mux.Handle("/static/", http.FileServerFS(staticFS))
@@ -47,6 +48,13 @@ func NewServer(s *store.Store) *Server {
 	srv.mux.HandleFunc("/accounts", srv.handleAccounts)
 	srv.mux.HandleFunc("/accounts/type", srv.handleAccountType)
 	srv.mux.HandleFunc("/transactions", srv.handleTransactions)
+	srv.mux.HandleFunc("/transactions/category", srv.handleTxnCategory)
+	srv.mux.HandleFunc("/categories", srv.handleCategories)
+	srv.mux.HandleFunc("/categories/add", srv.handleCategoryAdd)
+	srv.mux.HandleFunc("/categories/delete", srv.handleCategoryDelete)
+	srv.mux.HandleFunc("/categories/rule/add", srv.handleRuleAdd)
+	srv.mux.HandleFunc("/categories/rule/delete", srv.handleRuleDelete)
+	srv.mux.HandleFunc("/categories/recategorize", srv.handleRecategorize)
 	srv.mux.HandleFunc("/setup", srv.handleSetup)
 	srv.mux.HandleFunc("/sync", srv.handleSync)
 	return srv
@@ -85,7 +93,7 @@ func page(name string) *template.Template {
 
 // viewBase carries fields the shared layout (sidebar) needs on every page.
 type viewBase struct {
-	Active    string // "spending" | "accounts" | "transactions"
+	Active    string // "spending" | "accounts" | "transactions" | "categories"
 	Connected bool
 	Error     string
 	Notices   []string // SimpleFIN connection warnings from the last sync

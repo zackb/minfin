@@ -1,0 +1,115 @@
+{{define "content"}}
+<h1>Categories</h1>
+
+<div class="card">
+  <form method="get" action="/categories" class="filters">
+    <div class="f"><label>From</label><input type="date" name="from" value="{{.From}}"></div>
+    <div class="f"><label>To</label><input type="date" name="to" value="{{.To}}"></div>
+    <button type="submit" class="primary">Filter</button>
+  </form>
+</div>
+
+<div class="card chart-card">
+  <h2>Spending by Category</h2>
+  {{if .Spend}}
+  <div class="chart-wrap"><canvas id="spendChart"></canvas></div>
+  <table>
+    <tr><th>Category</th><th class="num">Txns</th><th class="num">Spent</th></tr>
+    {{range .Spend}}
+    <tr><td>{{.Category}}</td><td class="num">{{.Count}}</td><td class="num">{{money .Amount}}</td></tr>
+    {{end}}
+  </table>
+  {{else}}<p class="muted">No spending in this range.</p>{{end}}
+</div>
+
+<div class="card chart-card">
+  <h2>Income by Category</h2>
+  {{if .Income}}
+  <div class="chart-wrap"><canvas id="incomeChart"></canvas></div>
+  <table>
+    <tr><th>Category</th><th class="num">Txns</th><th class="num">Received</th></tr>
+    {{range .Income}}
+    <tr><td>{{.Category}}</td><td class="num">{{.Count}}</td><td class="num">{{money .Amount}}</td></tr>
+    {{end}}
+  </table>
+  {{else}}<p class="muted">No income in this range.</p>{{end}}
+</div>
+
+<div class="card">
+  <h2>Manage Categories</h2>
+  <form method="post" action="/categories/add" class="controls">
+    <input type="text" name="name" placeholder="New category" required>
+    <button type="submit" class="primary">Add</button>
+  </form>
+  <table>
+    <tr><th>Category</th><th></th></tr>
+    {{range .Categories}}
+    <tr>
+      <td>{{.Name}}{{if .Exclude}}<span class="badge">excluded</span>{{end}}</td>
+      <td class="num">
+        <form method="post" action="/categories/delete" onsubmit="return confirm('Delete {{.Name}}? Transactions and rules using it are cleared.')">
+          <input type="hidden" name="name" value="{{.Name}}">
+          <button type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {{end}}
+  </table>
+</div>
+
+<div class="card">
+  <h2>Auto-categorization Rules</h2>
+  <p class="muted">A payee containing the pattern is categorized on the next sync. Existing categories are never overwritten.</p>
+  <form method="post" action="/categories/rule/add" class="controls">
+    <input type="text" name="pattern" placeholder="payee contains…" required>
+    <select name="category" required>
+      <option value="" disabled selected>category…</option>
+      {{range .Categories}}<option value="{{.Name}}">{{.Name}}</option>{{end}}
+    </select>
+    <button type="submit" class="primary">Add rule</button>
+  </form>
+  {{if .Rules}}
+  <table>
+    <tr><th>Payee contains</th><th>Category</th><th></th></tr>
+    {{range .Rules}}
+    <tr>
+      <td>{{.Pattern}}</td>
+      <td>{{.Category}}</td>
+      <td class="num">
+        <form method="post" action="/categories/rule/delete">
+          <input type="hidden" name="id" value="{{.ID}}">
+          <button type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {{end}}
+  </table>
+  {{end}}
+  <form method="post" action="/categories/recategorize" class="controls">
+    <button type="submit" class="primary">Recategorize past transactions</button>
+  </form>
+</div>
+
+<script>
+  const palette = ['#26c6da','#7e57c2','#66bb6a','#ffa726','#ef5350','#42a5f5','#ec407a','#26a69a'];
+  function pie(id, data) {
+    if (!data || !data.labels || !data.labels.length) return;
+    new Chart(document.getElementById(id), {
+      type: 'doughnut',
+      data: {
+        labels: data.labels,
+        datasets: [{ data: data.values, backgroundColor: data.colors, borderWidth: 0 }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { color: '#9aa0a6' } },
+          tooltip: { callbacks: { label: c => c.label + ': $' + c.parsed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } },
+        },
+      },
+    });
+  }
+  pie('spendChart', {{.SpendJSON}});
+  pie('incomeChart', {{.IncomeJSON}});
+</script>
+{{end}}

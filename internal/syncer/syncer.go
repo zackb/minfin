@@ -28,7 +28,16 @@ func Sync(s *store.Store, accessURL string) error {
 	if err := s.SetSyncStatus(store.SyncStatus{At: time.Now(), Errors: set.Errors}); err != nil {
 		log.Printf("save sync status: %v", err)
 	}
-	return s.SaveAccountSet(set)
+	if err := s.SaveAccountSet(set); err != nil {
+		return err
+	}
+	// Auto-categorize newly synced transactions from the saved rules.
+	if n, err := s.ApplyRules(); err != nil {
+		log.Printf("apply rules: %v", err)
+	} else if n > 0 {
+		log.Printf("categorized %d transactions", n)
+	}
+	return nil
 }
 
 // Loop resyncs on an interval until the process exits.

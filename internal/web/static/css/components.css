@@ -34,6 +34,8 @@ button.primary {
 }
 
 label.chk { display: flex; align-items: center; gap: .4rem; color: var(--muted); }
+form.catform { display: flex; align-items: center; gap: .4rem; white-space: nowrap; }
+form.catform label.chk { font-size: .75rem; }
 
 input[type=text] {
   background: var(--surface2);
