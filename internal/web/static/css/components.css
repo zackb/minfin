@@ -44,6 +44,20 @@ a.nicklabel { color: var(--muted); }
 form.nickform.editing .nicklabel { display: none; }
 form.nickform.editing .nickedit { display: flex; }
 
+form.valform { display: flex; align-items: center; justify-content: flex-end; gap: .3rem; white-space: nowrap; }
+form.valform input[type=number] {
+  width: 7rem;
+  min-width: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: .35rem .5rem;
+}
+form.valform button { padding: .35rem .5rem; }
+
 input[type=text] {
   background: var(--surface2);
   color: var(--text);
