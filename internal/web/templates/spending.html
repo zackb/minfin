@@ -50,6 +50,12 @@
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
+      onClick: (e, els) => {
+        if (!els.length) return;
+        const r = series.ranges[els[0].index];
+        if (r) window.location = `/transactions?from=${r.from}&to=${r.to}`;
+      },
+      onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
       plugins: {
         legend: { display: series.lines.length > 1, labels: { color: '#9aa0a6' } },
         tooltip: { callbacks: { label: c => c.dataset.label + ': $' + c.parsed.y.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } },

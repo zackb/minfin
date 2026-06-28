@@ -63,6 +63,57 @@ func TestSpendingSeries(t *testing.T) {
 	if len(series.Lines) != 1 || series.Lines[0].Values[0] != 15 || series.Lines[0].Values[1] != 27.5 {
 		t.Fatalf("values = %+v, want [15 27.5]", series.Lines)
 	}
+	// Daily buckets: each range is the single day, fully inside the window.
+	if series.Ranges[0] != (Bucket{"2026-06-10", "2026-06-10"}) ||
+		series.Ranges[1] != (Bucket{"2026-06-11", "2026-06-11"}) {
+		t.Fatalf("daily ranges = %+v", series.Ranges)
+	}
+}
+
+func TestSpendingRangesMonthly(t *testing.T) {
+	s := seedStore(t)
+	start := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	series, err := s.SpendingSeries(start, end, "monthly", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(series.Ranges) != 1 || series.Ranges[0] != (Bucket{"2026-06-01", "2026-06-30"}) {
+		t.Fatalf("monthly ranges = %+v, want one 2026-06-01..2026-06-30", series.Ranges)
+	}
+}
+
+func TestSpendingRangesWeekly(t *testing.T) {
+	s := seedStore(t)
+	// Window covering the week of the seed data; no clamping.
+	start := time.Date(2026, 6, 8, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
+	series, err := s.SpendingSeries(start, end, "weekly", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Expected Monday-start of the week containing the data, computed the same
+	// way the app does, to validate the SQL produces the same Monday.
+	d := time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC)
+	monday := d.AddDate(0, 0, -((int(d.Weekday())+6)%7))
+	want := Bucket{monday.Format(dateLayout), monday.AddDate(0, 0, 6).Format(dateLayout)}
+	if len(series.Ranges) != 1 || series.Ranges[0] != want {
+		t.Fatalf("weekly ranges = %+v, want one %+v", series.Ranges, want)
+	}
+}
+
+func TestSpendingRangesClamp(t *testing.T) {
+	s := seedStore(t)
+	// Monthly bucket but a sub-month window: both ends clamp to the window.
+	start := time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 6, 12, 0, 0, 0, 0, time.UTC) // exclusive
+	series, err := s.SpendingSeries(start, end, "monthly", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(series.Ranges) != 1 || series.Ranges[0] != (Bucket{"2026-06-10", "2026-06-11"}) {
+		t.Fatalf("clamped ranges = %+v, want 2026-06-10..2026-06-11", series.Ranges)
+	}
 }
 
 func TestTopPayees(t *testing.T) {
