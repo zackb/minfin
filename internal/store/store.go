@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/zackb/minfin/internal/simplefin"
 	_ "modernc.org/sqlite"
@@ -20,6 +19,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   org_name TEXT,
   name TEXT,
   currency TEXT,
+  type TEXT NOT NULL DEFAULT '',
   balance_cents INTEGER,
   balance_date INTEGER
 );
@@ -43,12 +43,6 @@ func Open(path string) (*Store, error) {
 	}
 	if _, err := db.Exec(schema); err != nil {
 		return nil, fmt.Errorf("schema: %w", err)
-	}
-	// ponytail: one-shot ALTER, no migration framework. Idempotent: ignore the
-	// "duplicate column name" error on DBs that already have the column.
-	if _, err := db.Exec(`ALTER TABLE accounts ADD COLUMN type TEXT NOT NULL DEFAULT ''`); err != nil &&
-		!strings.Contains(err.Error(), "duplicate column name") {
-		return nil, fmt.Errorf("migrate type: %w", err)
 	}
 	return &Store{db}, nil
 }

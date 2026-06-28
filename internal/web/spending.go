@@ -23,10 +23,6 @@ type spendingView struct {
 }
 
 func (s *Server) handleSpending(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
 	q := r.URL.Query()
 	v := spendingView{
 		viewBase:        s.base("spending"),

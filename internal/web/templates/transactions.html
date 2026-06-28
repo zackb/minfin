@@ -1,22 +1,6 @@
 {{define "content"}}
 <h1>Transactions</h1>
 
-<style>
-  .filters{display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end}
-  .filters .f{display:flex;flex-direction:column;gap:.25rem}
-  .filters label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
-  .filters input,.filters select{background:var(--surface2);color:var(--text);
-    border:1px solid var(--line);border-radius:8px;padding:.5rem .6rem;font-size:.95rem}
-  .badge{font-size:.7rem;color:#ffd180;border:1px solid #5d4b1f;background:#2a230f;
-    border-radius:6px;padding:.05rem .4rem;margin-left:.4rem;vertical-align:middle}
-  .pager{display:flex;gap:.75rem;align-items:center;margin-top:1rem}
-  .pager a{color:var(--accent);text-decoration:none;border:1px solid var(--line);
-    border-radius:8px;padding:.4rem .8rem}
-  .pager span.disabled{color:var(--muted);border:1px solid var(--line);
-    border-radius:8px;padding:.4rem .8rem;opacity:.5}
-  .desc{color:var(--muted);font-size:.85rem}
-</style>
-
 <div class="card">
   <form method="get" action="/transactions" class="filters">
     <div class="f"><label>From</label><input type="date" name="from" value="{{.From}}"></div>

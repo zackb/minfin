@@ -1,7 +1,7 @@
 {{define "content"}}
 <h1>Spending</h1>
 <div class="card chart-card">
-  <form method="get" action="/" class="controls">
+  <form method="get" action="/spending" class="controls">
     <select name="range" onchange="this.form.submit()">
       {{$r := .Range}}{{range .RangeOptions}}
       <option value="{{.Key}}" {{if eq .Key $r}}selected{{end}}>{{.Label}}</option>

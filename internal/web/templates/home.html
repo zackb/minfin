@@ -1,0 +1,81 @@
+{{define "content"}}
+<h1>Dashboard</h1>
+
+<div class="card">
+  <div class="hero">
+    <div>
+      <div class="muted">Net Worth</div>
+      <div class="net {{if lt .NetWorth 0.0}}neg{{else}}pos{{end}}">{{money .NetWorth}}</div>
+    </div>
+    <div class="chip">
+      <div class="muted">Assets</div>
+      <div class="big pos">{{money .Assets}}</div>
+    </div>
+    <div class="chip">
+      <div class="muted">Liabilities</div>
+      <div class="big neg">{{money .Liabilities}}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card chart-card">
+  <h2>Spending · Last 30 Days <a class="link" href="/spending">view all →</a></h2>
+  <div class="mini-chart"><canvas id="chart"></canvas></div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Accounts</h2>
+    {{if .Accounts}}
+    <table>
+      <tr><th>Account</th><th class="num">Balance</th></tr>
+      {{range .Accounts}}
+      <tr>
+        <td>{{.Name}} <span class="muted">{{.Org}}</span></td>
+        <td class="num {{if lt .Balance 0.0}}neg{{else}}pos{{end}}">{{money .Balance}}</td>
+      </tr>
+      {{end}}
+    </table>
+    {{else}}<p class="muted">No accounts synced yet.</p>{{end}}
+  </div>
+
+  <div class="card">
+    <h2>Top Vendors · 30 Days</h2>
+    {{if .Payees}}
+    <table>
+      <tr><th>Vendor</th><th class="num">Spent</th></tr>
+      {{range .Payees}}
+      <tr><td>{{.Payee}}</td><td class="num">{{money .Spent}}</td></tr>
+      {{end}}
+    </table>
+    {{else}}<p class="muted">No spending in the last 30 days.</p>{{end}}
+  </div>
+</div>
+
+<script>
+  const series = {{.ChartJSON}};
+  const line = (series.lines && series.lines[0]) || { values: [] };
+  new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: {
+      labels: series.labels,
+      datasets: [{
+        data: line.values, borderColor: '#26c6da', backgroundColor: '#26c6da33',
+        borderWidth: 2, tension: .35, fill: true, pointRadius: 0, pointHoverRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => '$' + c.parsed.y.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } },
+      },
+      scales: {
+        x: { grid: { color: '#2a2a2a' }, ticks: { color: '#9aa0a6', maxRotation: 0, autoSkip: true } },
+        y: { grid: { color: '#2a2a2a' }, ticks: { color: '#9aa0a6', callback: v => '$' + v.toLocaleString('en-US') } },
+      },
+    },
+  });
+</script>
+{{end}}

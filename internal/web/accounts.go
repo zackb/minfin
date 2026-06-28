@@ -24,16 +24,23 @@ func (s *Server) handleAccounts(w http.ResponseWriter, r *http.Request) {
 			v.Error = err.Error()
 		}
 		v.Accounts = accts
-		for _, a := range accts {
-			v.NetWorth += a.Balance
-			if a.Liability {
-				v.Liabilities += a.Balance
-			} else {
-				v.Assets += a.Balance
-			}
-		}
+		v.Assets, v.Liabilities, v.NetWorth = summarize(accts)
 	}
 	s.render(w, "accounts", v)
+}
+
+// summarize splits accounts into asset/liability totals. Liability balances
+// already arrive negative, so net worth is just their sum.
+func summarize(accts []store.AccountInfo) (assets, liabilities, net float64) {
+	for _, a := range accts {
+		net += a.Balance
+		if a.Liability {
+			liabilities += a.Balance
+		} else {
+			assets += a.Balance
+		}
+	}
+	return assets, liabilities, net
 }
 
 func (s *Server) handleAccountType(w http.ResponseWriter, r *http.Request) {

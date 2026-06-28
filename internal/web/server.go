@@ -18,7 +18,7 @@ import (
 //go:embed templates/*.html
 var templatesFS embed.FS
 
-//go:embed static/*
+//go:embed static
 var staticFS embed.FS
 
 // Server holds dependencies and the parsed page templates. Each page is parsed
@@ -35,13 +35,15 @@ func NewServer(s *store.Store) *Server {
 		store: s,
 		mux:   http.NewServeMux(),
 		pages: map[string]*template.Template{
+			"home":         page("home.html"),
 			"spending":     page("spending.html"),
 			"accounts":     page("accounts.html"),
 			"transactions": page("transactions.html"),
 		},
 	}
 	srv.mux.Handle("/static/", http.FileServerFS(staticFS))
-	srv.mux.HandleFunc("/", srv.handleSpending)
+	srv.mux.HandleFunc("/", srv.handleHome)
+	srv.mux.HandleFunc("/spending", srv.handleSpending)
 	srv.mux.HandleFunc("/accounts", srv.handleAccounts)
 	srv.mux.HandleFunc("/accounts/type", srv.handleAccountType)
 	srv.mux.HandleFunc("/transactions", srv.handleTransactions)

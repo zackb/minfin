@@ -18,6 +18,9 @@ func newTestServer(t *testing.T) *Server {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := st.SetAccessURL("http://example.test/simplefin"); err != nil {
+		t.Fatal(err)
+	}
 	if err := st.SaveAccountSet(simplefin.AccountSet{Accounts: []simplefin.Account{
 		{ID: "a1", Name: "Checking", Balance: "100.00"},
 	}}); err != nil {
