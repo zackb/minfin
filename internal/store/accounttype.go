@@ -1,22 +1,35 @@
 package store
 
 // AccountType is a user-assignable account category. Liability marks the ones
-// that count against net worth (their balances already arrive negative).
+// that count against net worth (their balances already arrive negative). Asset
+// marks loan types with an underlying asset (house, car) whose value the user
+// can enter so net worth and equity are correct.
 type AccountType struct {
 	Key       string
 	Label     string
 	Liability bool
+	Asset     bool
 }
 
 var AccountTypes = []AccountType{
-	{"checking", "Checking", false},
-	{"savings", "Savings", false},
-	{"investment", "Investment", false},
-	{"credit_card", "Credit Card", true},
-	{"mortgage", "Mortgage", true},
-	{"auto_loan", "Auto Loan", true},
-	{"loan", "Loan", true},
-	{"other", "Other", false},
+	{"checking", "Checking", false, false},
+	{"savings", "Savings", false, false},
+	{"investment", "Investment", false, false},
+	{"credit_card", "Credit Card", true, false},
+	{"mortgage", "Mortgage", true, true},
+	{"auto_loan", "Auto Loan", true, true},
+	{"loan", "Loan", true, false},
+	{"other", "Other", false, false},
+}
+
+// HasAsset reports whether a type carries an underlying asset value.
+func HasAsset(typ string) bool {
+	for _, t := range AccountTypes {
+		if t.Key == typ {
+			return t.Asset
+		}
+	}
+	return false
 }
 
 // ValidType reports whether key is the empty (uncategorized) value or a known type.

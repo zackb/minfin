@@ -28,6 +28,8 @@
     <tr>
       <th>Institution</th><th>Account</th><th>Nickname</th><th>Type</th>
       <th class="num">Balance</th>
+      <th class="num">Value</th>
+      <th class="num">Equity</th>
       <th class="num">Spent (30d)</th>
       <th class="num">Txns</th>
       <th>Last Activity</th>
@@ -63,6 +65,18 @@
         </form>
       </td>
       <td class="num {{if lt .Balance 0.0}}neg{{else}}pos{{end}}">{{money .Balance}}</td>
+      <td class="num">
+        {{if .HasAsset}}
+        <form method="post" action="/accounts/asset-value" class="valform">
+          <input type="hidden" name="id" value="{{.ID}}">
+          <input type="number" name="value" step="0.01" min="0" value="{{printf "%.2f" .AssetValue}}" placeholder="value">
+          <button type="submit" title="Save value">✓</button>
+        </form>
+        {{else}}<span class="muted">—</span>{{end}}
+      </td>
+      <td class="num {{if .HasAsset}}{{if lt .Equity 0.0}}neg{{else}}pos{{end}}{{end}}">
+        {{if .HasAsset}}{{money .Equity}}{{else}}<span class="muted">—</span>{{end}}
+      </td>
       <td class="num">{{money .Spent30}}</td>
       <td class="num">{{.TxnCount}}</td>
       <td>{{if .LastTxn}}{{.LastTxn}}{{else}}<span class="muted">no transactions</span>{{end}}</td>

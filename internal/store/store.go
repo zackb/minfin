@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/zackb/minfin/internal/simplefin"
 	_ "modernc.org/sqlite"
@@ -21,6 +20,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   name TEXT,
   currency TEXT,
   type TEXT NOT NULL DEFAULT '',
+  nickname TEXT NOT NULL DEFAULT '',
+  asset_value_cents INTEGER NOT NULL DEFAULT 0,
   balance_cents INTEGER,
   balance_date INTEGER
 );
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   amount_cents INTEGER,
   payee TEXT,
   description TEXT,
+  category TEXT NOT NULL DEFAULT '',
   pending INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_txn_posted ON transactions(posted);
@@ -55,16 +57,6 @@ func Open(path string) (*Store, error) {
 	}
 	if _, err := db.Exec(schema); err != nil {
 		return nil, fmt.Errorf("schema: %w", err)
-	}
-	// ponytail: one-shot ALTER, no migration framework. Idempotent: ignore the
-	// "duplicate column name" error on DBs that already have the column.
-	if _, err := db.Exec(`ALTER TABLE transactions ADD COLUMN category TEXT NOT NULL DEFAULT ''`); err != nil &&
-		!strings.Contains(err.Error(), "duplicate column name") {
-		return nil, fmt.Errorf("migrate category: %w", err)
-	}
-	if _, err := db.Exec(`ALTER TABLE accounts ADD COLUMN nickname TEXT NOT NULL DEFAULT ''`); err != nil &&
-		!strings.Contains(err.Error(), "duplicate column name") {
-		return nil, fmt.Errorf("migrate nickname: %w", err)
 	}
 	s := &Store{db}
 	if err := s.seedCategories(); err != nil {

@@ -39,6 +39,28 @@ func postType(t *testing.T, s *Server, id, typ string) int {
 	return rec.Code
 }
 
+func TestSummarizeWithAsset(t *testing.T) {
+	// Mortgage: -320k loan + 500k home value => +180k equity, asset counts
+	// toward assets/net, loan toward liabilities.
+	accts := []store.AccountInfo{
+		{Balance: 100, Liability: false},                                        // checking
+		{Balance: -320000, Liability: true, HasAsset: true, AssetValue: 500000}, // mortgage
+	}
+	assets, liabilities, net := summarize(accts)
+	if assets != 500100 {
+		t.Errorf("assets: got %v, want 500100", assets)
+	}
+	if liabilities != -320000 {
+		t.Errorf("liabilities: got %v, want -320000", liabilities)
+	}
+	if net != 180100 {
+		t.Errorf("net: got %v, want 180100", net)
+	}
+	if eq := accts[1].Equity(); eq != 180000 {
+		t.Errorf("equity: got %v, want 180000", eq)
+	}
+}
+
 func TestHandleAccountType(t *testing.T) {
 	s := newTestServer(t)
 	if code := postType(t, s, "a1", "bogus"); code != http.StatusBadRequest {
