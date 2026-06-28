@@ -29,7 +29,7 @@
   <table>
     <tr><th>Category</th><th class="num">Txns</th><th class="num">Received</th></tr>
     {{range .Income}}
-    <tr><td>{{.Category}}</td><td class="num">{{.Count}}</td><td class="num">{{money .Amount}}</td></tr>
+    <tr><td><a href="/transactions?from={{$.From}}&to={{$.To}}&category={{if eq .Category "Uncategorized"}}none{{else}}{{.Category | urlquery}}{{end}}">{{.Category}}</a></td><td class="num">{{.Count}}</td><td class="num">{{money .Amount}}</td></tr>
     {{end}}
   </table>
   {{else}}<p class="muted">No income in this range.</p>{{end}}
@@ -45,7 +45,7 @@
     <tr><th>Category</th><th></th></tr>
     {{range .Categories}}
     <tr>
-      <td>{{.Name}}{{if .Exclude}}<span class="badge">excluded</span>{{end}}</td>
+      <td><a href="/transactions?from={{$.From}}&to={{$.To}}&category={{.Name | urlquery}}">{{.Name}}</a>{{if .Exclude}}<span class="badge">excluded</span>{{end}}</td>
       <td class="num">
         <form method="post" action="/categories/exclude" style="display:inline">
           <input type="hidden" name="name" value="{{.Name}}">
