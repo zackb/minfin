@@ -13,6 +13,19 @@ import (
 // request at 90 days (and recommends 45), so 89 maximizes history without
 // tripping the "was capped" error. Deeper history still accumulates across
 // repeated syncs since we dedup by txn id and never delete.
+//
+// The wide window is deliberate, not lazy: re-pulling ~89 days every sync makes
+// the feed self-healing — any missed-sync gap or backdated/late-posting
+// transaction within ~89 days is recovered on the next sync. SimpleFIN's
+// "exceeds recommended range of 45 days" warning is expected and intentionally
+// ignored; the per-sync cost (upsert-by-id of ~90 days of txns) is cheap.
+//
+// Do NOT shrink this to silence the warning or trim load: a smaller window
+// reintroduces gap risk AND truncates a newly connected account's initial
+// backfill (banks backfill up to ~90 days, often hours after first connect).
+// If multi-user sync load is ever *measured* to be a problem, stagger syncs and
+// move to Postgres first; only then adopt the adaptive window plan
+// (gap-since-last-sync + margin, with a first_seen settling guard).
 const LookbackDays = 89
 
 // Sync pulls accounts+transactions from SimpleFIN into the store and records the
