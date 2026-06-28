@@ -31,7 +31,7 @@
       <tr><th>Account</th><th class="num">Balance</th></tr>
       {{range .Accounts}}
       <tr>
-        <td>{{.Name}} <span class="muted">{{.Org}}</span></td>
+        <td>{{.Display}} <span class="muted">{{.Org}}</span></td>
         <td class="num {{if lt .Balance 0.0}}neg{{else}}pos{{end}}">{{money .Balance}}</td>
       </tr>
       {{end}}

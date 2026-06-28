@@ -36,7 +36,14 @@
     {{range .Accounts}}
     <tr>
       <td>{{.Org}}</td>
-      <td>{{.Name}} <span class="muted">{{.Currency}}</span></td>
+      <td>
+        {{.Name}} <span class="muted">{{.Currency}}</span>
+        <form method="post" action="/accounts/nickname">
+          <input type="hidden" name="id" value="{{.ID}}">
+          <input type="text" name="nickname" value="{{.Nickname}}"
+                 placeholder="nickname" onchange="this.form.submit()">
+        </form>
+      </td>
       <td>
         <form method="post" action="/accounts/type">
           <input type="hidden" name="id" value="{{.ID}}">

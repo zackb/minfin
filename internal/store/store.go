@@ -62,6 +62,10 @@ func Open(path string) (*Store, error) {
 		!strings.Contains(err.Error(), "duplicate column name") {
 		return nil, fmt.Errorf("migrate category: %w", err)
 	}
+	if _, err := db.Exec(`ALTER TABLE accounts ADD COLUMN nickname TEXT NOT NULL DEFAULT ''`); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column name") {
+		return nil, fmt.Errorf("migrate nickname: %w", err)
+	}
 	s := &Store{db}
 	if err := s.seedCategories(); err != nil {
 		return nil, fmt.Errorf("seed categories: %w", err)

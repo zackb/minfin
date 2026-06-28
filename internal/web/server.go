@@ -47,6 +47,7 @@ func NewServer(s *store.Store) *Server {
 	srv.mux.HandleFunc("/spending", srv.handleSpending)
 	srv.mux.HandleFunc("/accounts", srv.handleAccounts)
 	srv.mux.HandleFunc("/accounts/type", srv.handleAccountType)
+	srv.mux.HandleFunc("/accounts/nickname", srv.handleAccountNickname)
 	srv.mux.HandleFunc("/transactions", srv.handleTransactions)
 	srv.mux.HandleFunc("/transactions/category", srv.handleTxnCategory)
 	srv.mux.HandleFunc("/categories", srv.handleCategories)

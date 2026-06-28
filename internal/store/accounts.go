@@ -6,6 +6,7 @@ type AccountInfo struct {
 	ID        string
 	Org       string
 	Name      string
+	Nickname  string
 	Currency  string
 	Type      string  // account type key, "" if uncategorized
 	Liability bool    // counts against net worth
@@ -19,7 +20,7 @@ type AccountInfo struct {
 func (s *Store) Accounts(now time.Time) ([]AccountInfo, error) {
 	cut := now.AddDate(0, 0, -30).Unix()
 	rows, err := s.db.Query(`
-		SELECT a.id, a.org_name, a.name, a.currency, a.type, a.balance_cents,
+		SELECT a.id, a.org_name, a.name, a.nickname, a.currency, a.type, a.balance_cents,
 		       COUNT(t.id),
 		       COALESCE(MAX(t.posted), 0),
 		       -COALESCE(SUM(CASE WHEN t.amount_cents < 0 AND t.posted >= ? THEN t.amount_cents ELSE 0 END), 0)
@@ -34,7 +35,7 @@ func (s *Store) Accounts(now time.Time) ([]AccountInfo, error) {
 	for rows.Next() {
 		var a AccountInfo
 		var balCents, lastPosted, spentCents int64
-		if err := rows.Scan(&a.ID, &a.Org, &a.Name, &a.Currency, &a.Type, &balCents, &a.TxnCount, &lastPosted, &spentCents); err != nil {
+		if err := rows.Scan(&a.ID, &a.Org, &a.Name, &a.Nickname, &a.Currency, &a.Type, &balCents, &a.TxnCount, &lastPosted, &spentCents); err != nil {
 			return nil, err
 		}
 		a.Liability = Classify(a.Type, balCents)
@@ -48,9 +49,23 @@ func (s *Store) Accounts(now time.Time) ([]AccountInfo, error) {
 	return out, rows.Err()
 }
 
+// Display is the nickname if set, else the institution-given name.
+func (a AccountInfo) Display() string {
+	if a.Nickname != "" {
+		return a.Nickname
+	}
+	return a.Name
+}
+
 // SetAccountType assigns a category to an account.
 func (s *Store) SetAccountType(id, typ string) error {
 	_, err := s.db.Exec(`UPDATE accounts SET type=? WHERE id=?`, typ, id)
+	return err
+}
+
+// SetAccountNickname sets an optional user-friendly name; "" clears it.
+func (s *Store) SetAccountNickname(id, nick string) error {
+	_, err := s.db.Exec(`UPDATE accounts SET nickname=? WHERE id=?`, nick, id)
 	return err
 }
 
@@ -61,7 +76,7 @@ type AccountRef struct {
 }
 
 func (s *Store) AccountList() ([]AccountRef, error) {
-	rows, err := s.db.Query(`SELECT id, name FROM accounts ORDER BY name`)
+	rows, err := s.db.Query(`SELECT id, COALESCE(NULLIF(nickname,''), name) FROM accounts ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}

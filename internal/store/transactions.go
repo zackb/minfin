@@ -56,7 +56,7 @@ func (s *Store) Transactions(f TxnFilter) (rows []TxnRow, hasNext bool, err erro
 	}
 	args = append(args, limit+1, f.Offset) // +1 to detect a next page
 
-	q := `SELECT t.id, t.posted, COALESCE(NULLIF(a.name,''), t.account_id),
+	q := `SELECT t.id, t.posted, COALESCE(NULLIF(a.nickname,''), NULLIF(a.name,''), t.account_id),
 	             t.payee, t.description, t.category, t.amount_cents, t.pending
 	      FROM transactions t LEFT JOIN accounts a ON a.id = t.account_id
 	      WHERE ` + strings.Join(where, " AND ") + `

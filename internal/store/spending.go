@@ -49,7 +49,7 @@ func (s *Store) SpendingSeries(start, end time.Time, interval string, perAccount
 	}
 	rows, err := s.db.Query(
 		`SELECT `+bucket+` AS b,
-		        COALESCE(NULLIF(a.name,''), t.account_id) AS line,
+		        COALESCE(NULLIF(a.nickname,''), NULLIF(a.name,''), t.account_id) AS line,
 		        -SUM(t.amount_cents) AS spent
 		 FROM transactions t LEFT JOIN accounts a ON a.id = t.account_id
 		 WHERE `+where+`

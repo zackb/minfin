@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/zackb/minfin/internal/store"
@@ -51,6 +52,20 @@ func (s *Server) handleAccountType(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.SetAccountType(id, typ); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/accounts", http.StatusSeeOther)
+}
+
+func (s *Server) handleAccountNickname(w http.ResponseWriter, r *http.Request) {
+	id := r.FormValue("id")
+	if id == "" {
+		http.Error(w, "invalid account", http.StatusBadRequest)
+		return
+	}
+	nick := strings.TrimSpace(r.FormValue("nickname"))
+	if err := s.store.SetAccountNickname(id, nick); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
