@@ -47,7 +47,12 @@
     <tr>
       <td>{{.Name}}{{if .Exclude}}<span class="badge">excluded</span>{{end}}</td>
       <td class="num">
-        <form method="post" action="/categories/delete" onsubmit="return confirm('Delete {{.Name}}? Transactions and rules using it are cleared.')">
+        <form method="post" action="/categories/exclude" style="display:inline">
+          <input type="hidden" name="name" value="{{.Name}}">
+          <input type="hidden" name="exclude" value="{{if .Exclude}}0{{else}}1{{end}}">
+          <button type="submit" title="Excluded categories are left out of spending, income, and budget totals">{{if .Exclude}}Include in budget{{else}}Exclude from budget{{end}}</button>
+        </form>
+        <form method="post" action="/categories/delete" style="display:inline" onsubmit="return confirm('Delete {{.Name}}? Transactions and rules using it are cleared.')">
           <input type="hidden" name="name" value="{{.Name}}">
           <button type="submit">Delete</button>
         </form>

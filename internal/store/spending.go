@@ -30,11 +30,14 @@ func bucketExpr(interval string) string {
 // ponytail: assumes one currency; group/convert if accounts mix.
 func (s *Store) SpendingSeries(start, end time.Time, interval string, perAccount bool) (Series, error) {
 	bucket := bucketExpr(interval)
-	where := `posted >= ? AND posted < ? AND amount_cents < 0`
+	// Join categories so excluded categories (e.g. Transfer, Credit Card Payment)
+	// drop out of the spending totals, matching the category pie charts.
+	from := `transactions t LEFT JOIN categories c ON c.name = t.category`
+	where := `t.posted >= ? AND t.posted < ? AND t.amount_cents < 0 AND COALESCE(c.exclude,0)=0`
 	args := []any{start.Unix(), end.Unix()}
 
 	labels, err := s.queryStrings(
-		`SELECT DISTINCT `+bucket+` AS b FROM transactions WHERE `+where+` ORDER BY b`, args...)
+		`SELECT DISTINCT `+bucket+` AS b FROM `+from+` WHERE `+where+` ORDER BY b`, args...)
 	if err != nil {
 		return Series{}, err
 	}
@@ -51,7 +54,9 @@ func (s *Store) SpendingSeries(start, end time.Time, interval string, perAccount
 		`SELECT `+bucket+` AS b,
 		        COALESCE(NULLIF(a.nickname,''), NULLIF(a.name,''), t.account_id) AS line,
 		        -SUM(t.amount_cents) AS spent
-		 FROM transactions t LEFT JOIN accounts a ON a.id = t.account_id
+		 FROM transactions t
+		      LEFT JOIN accounts a ON a.id = t.account_id
+		      LEFT JOIN categories c ON c.name = t.category
 		 WHERE `+where+`
 		 GROUP BY `+groupCols+`
 		 ORDER BY b`, args...)
@@ -97,10 +102,10 @@ type PayeeStat struct {
 // TopPayees ranks debit spend by payee over [start,end), highest spend first.
 func (s *Store) TopPayees(start, end time.Time, limit int) ([]PayeeStat, error) {
 	rows, err := s.db.Query(
-		`SELECT payee, COUNT(*) AS n, -SUM(amount_cents) AS spent
-		 FROM transactions
-		 WHERE posted >= ? AND posted < ? AND amount_cents < 0
-		 GROUP BY payee
+		`SELECT t.payee, COUNT(*) AS n, -SUM(t.amount_cents) AS spent
+		 FROM transactions t LEFT JOIN categories c ON c.name = t.category
+		 WHERE t.posted >= ? AND t.posted < ? AND t.amount_cents < 0 AND COALESCE(c.exclude,0)=0
+		 GROUP BY t.payee
 		 ORDER BY spent DESC, n DESC
 		 LIMIT ?`, start.Unix(), end.Unix(), limit)
 	if err != nil {

@@ -53,6 +53,7 @@ func NewServer(s *store.Store) *Server {
 	srv.mux.HandleFunc("/categories", srv.handleCategories)
 	srv.mux.HandleFunc("/categories/add", srv.handleCategoryAdd)
 	srv.mux.HandleFunc("/categories/delete", srv.handleCategoryDelete)
+	srv.mux.HandleFunc("/categories/exclude", srv.handleCategoryExclude)
 	srv.mux.HandleFunc("/categories/rule/add", srv.handleRuleAdd)
 	srv.mux.HandleFunc("/categories/rule/delete", srv.handleRuleDelete)
 	srv.mux.HandleFunc("/categories/recategorize", srv.handleRecategorize)

@@ -136,6 +136,16 @@ func (s *Server) handleCategoryDelete(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/categories", http.StatusSeeOther)
 }
 
+func (s *Server) handleCategoryExclude(w http.ResponseWriter, r *http.Request) {
+	if name := r.FormValue("name"); name != "" {
+		if err := s.store.SetCategoryExclude(name, r.FormValue("exclude") == "1"); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	http.Redirect(w, r, "/categories", http.StatusSeeOther)
+}
+
 func (s *Server) handleRuleAdd(w http.ResponseWriter, r *http.Request) {
 	pattern := strings.TrimSpace(r.FormValue("pattern"))
 	category := r.FormValue("category")

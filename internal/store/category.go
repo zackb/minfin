@@ -117,6 +117,14 @@ func (s *Store) AddCategory(name string) error {
 	return err
 }
 
+// SetCategoryExclude flags (or unflags) a category to leave it out of the
+// spend/income totals and the spending screen.
+func (s *Store) SetCategoryExclude(name string, exclude bool) error {
+	_, err := s.db.Exec(`UPDATE categories SET exclude=? WHERE name=?`,
+		boolToInt(exclude), name)
+	return err
+}
+
 // DeleteCategory removes a category, clearing it from any transactions and rules.
 func (s *Store) DeleteCategory(name string) error {
 	tx, err := s.db.Begin()

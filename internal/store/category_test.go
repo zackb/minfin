@@ -144,6 +144,59 @@ func TestTransferExcludedFromSpend(t *testing.T) {
 	}
 }
 
+func TestSetCategoryExcludeHidesFromSpending(t *testing.T) {
+	s := seedStore(t)
+	s.AddCategory("Cards")
+	// Put all the Coffee debits (t1 $10, t2 $5, t5 $7.50) into Cards, then exclude it.
+	for _, id := range []string{"t1", "t2", "t5"} {
+		if err := s.SetTxnCategory(id, "Cards"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.SetCategoryExclude("Cards", true); err != nil {
+		t.Fatal(err)
+	}
+
+	spend, err := s.SpendByCategory(rangeStart, rangeEnd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, st := range spend {
+		if st.Category == "Cards" {
+			t.Fatalf("Cards should be excluded from spend pie, got %+v", st)
+		}
+	}
+
+	// Spending screen: only Grocer's $20 (2026-06-11) remains.
+	series, err := s.SpendingSeries(rangeStart, rangeEnd, "daily", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(series.Labels) != 1 || series.Labels[0] != "2026-06-11" {
+		t.Fatalf("labels = %v, want only 2026-06-11", series.Labels)
+	}
+	if series.Lines[0].Values[0] != 20 {
+		t.Fatalf("total = %v, want 20", series.Lines[0].Values[0])
+	}
+
+	// Top payees: Coffee gone, only Grocer left.
+	p, err := s.TopPayees(rangeStart, rangeEnd, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p) != 1 || p[0].Payee != "Grocer" {
+		t.Fatalf("top payees = %+v, want only Grocer", p)
+	}
+
+	// Toggling back restores it.
+	if err := s.SetCategoryExclude("Cards", false); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := s.TopPayees(rangeStart, rangeEnd, 10); len(p) != 2 {
+		t.Fatalf("after include, top payees = %+v, want 2", p)
+	}
+}
+
 func TestCategorySurvivesResync(t *testing.T) {
 	s := seedStore(t)
 	if err := s.SetTxnCategory("t1", "Groceries"); err != nil {
