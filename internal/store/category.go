@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"sort"
 	"strings"
 	"time"
 )
@@ -202,15 +203,22 @@ func (s *Store) DeleteRule(id int64) error {
 }
 
 // ApplyRules categorizes uncategorized transactions from the saved rules and
-// returns how many rows were updated. Fill-only (category=”): never overwrites
-// a manual or existing category, and idempotent. First matching rule (by id)
-// wins since later rules no longer see an empty category. Backs both the
-// on-sync auto-categorization and the manual "recategorize" button.
+// returns how many rows were updated. Fill-only (category=''): never overwrites
+// a manual or existing category, and idempotent. Rules apply longest-pattern
+// first, so the most specific match wins (e.g. "PayPal Instant Transfer" beats
+// "Transfer"); ties break by id. Backs both the on-sync auto-categorization and
+// the manual "recategorize" button.
 func (s *Store) ApplyRules() (int, error) {
 	rules, err := s.Rules()
 	if err != nil {
 		return 0, err
 	}
+	// Longest pattern wins: the fill-only guard means whichever rule runs first
+	// claims the row, so applying the most specific (longest) patterns first
+	// keeps a broad rule from stealing transactions a narrow one should own.
+	sort.SliceStable(rules, func(i, j int) bool {
+		return len(rules[i].Pattern) > len(rules[j].Pattern)
+	})
 	var n int64
 	for _, r := range rules {
 		res, err := s.db.Exec(

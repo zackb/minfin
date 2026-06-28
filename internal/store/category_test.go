@@ -47,6 +47,51 @@ func TestApplyRulesFillOnly(t *testing.T) {
 	}
 }
 
+func TestApplyRulesLongestMatchWins(t *testing.T) {
+	s := seedStore(t)
+	s.AddCategory("PayPal")
+	// Two transactions: one plain "Transfer", one "PayPal Instant Transfer".
+	if err := s.SaveAccountSet(simplefin.AccountSet{Accounts: []simplefin.Account{{
+		ID: "a1", Name: "Checking", Balance: "1000.00",
+		Transactions: []simplefin.Transaction{
+			{ID: "x1", Posted: at("2026-06-10T12:00:00Z"), Amount: "-100.00", Payee: "Transfer"},
+			{ID: "x2", Posted: at("2026-06-10T13:00:00Z"), Amount: "-50.00", Payee: "PayPal Instant Transfer"},
+		},
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	// Add the shorter, more general rule FIRST to prove order-independence.
+	if err := s.AddRule("Transfer", "Transfer"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddRule("PayPal Instant Transfer", "PayPal"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ApplyRules(); err != nil {
+		t.Fatal(err)
+	}
+
+	got := map[string]string{}
+	rows, err := s.db.Query(`SELECT id, category FROM transactions WHERE id IN ('x1','x2')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, cat string
+		if err := rows.Scan(&id, &cat); err != nil {
+			t.Fatal(err)
+		}
+		got[id] = cat
+	}
+	if got["x1"] != "Transfer" {
+		t.Errorf("x1 = %q, want Transfer", got["x1"])
+	}
+	if got["x2"] != "PayPal" { // longest pattern wins, not "Transfer"
+		t.Errorf("x2 = %q, want PayPal", got["x2"])
+	}
+}
+
 func TestSetTxnCategoryRejectsUnknown(t *testing.T) {
 	s := seedStore(t)
 	if err := s.SetTxnCategory("t1", "Nonexistent"); err != ErrUnknownCategory {
