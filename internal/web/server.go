@@ -3,6 +3,7 @@
 package web
 
 import (
+	"context"
 	"embed"
 	"html/template"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/zackb/minfin/internal/auth"
 	"github.com/zackb/minfin/internal/simplefin"
 	"github.com/zackb/minfin/internal/store"
 	"github.com/zackb/minfin/internal/syncer"
@@ -26,13 +28,15 @@ var staticFS embed.FS
 // "content" block without name collisions.
 type Server struct {
 	store *store.Store
+	auth  *auth.Service
 	mux   *http.ServeMux
 	pages map[string]*template.Template
 }
 
-func NewServer(s *store.Store) *Server {
+func NewServer(s *store.Store, a *auth.Service) *Server {
 	srv := &Server{
 		store: s,
+		auth:  a,
 		mux:   http.NewServeMux(),
 		pages: map[string]*template.Template{
 			"home":         page("home.html"),
@@ -40,9 +44,14 @@ func NewServer(s *store.Store) *Server {
 			"accounts":     page("accounts.html"),
 			"transactions": page("transactions.html"),
 			"categories":   page("categories.html"),
+			"login":        authPage("login.html"),
+			"signup":       authPage("signup.html"),
 		},
 	}
 	srv.mux.Handle("/static/", http.FileServerFS(staticFS))
+	srv.mux.HandleFunc("/login", srv.handleLogin)
+	srv.mux.HandleFunc("/signup", srv.handleSignup)
+	srv.mux.HandleFunc("/logout", srv.handleLogout)
 	srv.mux.HandleFunc("/", srv.handleHome)
 	srv.mux.HandleFunc("/spending", srv.handleSpending)
 	srv.mux.HandleFunc("/accounts", srv.handleAccounts)
@@ -63,7 +72,53 @@ func NewServer(s *store.Store) *Server {
 	return srv
 }
 
-func (s *Server) Handler() http.Handler { return s.mux }
+func (s *Server) Handler() http.Handler { return s.withAuth(s.mux) }
+
+type ctxKey int
+
+const (
+	ctxUserID ctxKey = iota
+	ctxPortfolioID
+)
+
+func userID(r *http.Request) string {
+	v, _ := r.Context().Value(ctxUserID).(string)
+	return v
+}
+
+func portfolioID(r *http.Request) string {
+	v, _ := r.Context().Value(ctxPortfolioID).(string)
+	return v
+}
+
+// publicPaths bypass auth: static assets and the auth screens themselves.
+func publicPath(p string) bool {
+	return p == "/login" || p == "/signup" || p == "/logout" || strings.HasPrefix(p, "/static/")
+}
+
+// withAuth requires a valid token on every non-public route, then resolves the
+// user's active portfolio (the first they belong to; multi-portfolio switching
+// is deferred) and stashes both ids on the request context.
+func (s *Server) withAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if publicPath(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		uid, ok := s.auth.IsAuthenticated(r)
+		if !ok {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		pid := ""
+		if ps, err := s.store.PortfoliosForUser(uid); err == nil && len(ps) > 0 {
+			pid = ps[0].ID
+		}
+		ctx := context.WithValue(r.Context(), ctxUserID, uid)
+		ctx = context.WithValue(ctx, ctxPortfolioID, pid)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
 
 var funcs = template.FuncMap{"money": money}
 
@@ -94,25 +149,34 @@ func page(name string) *template.Template {
 		ParseFS(templatesFS, "templates/layout.html", "templates/"+name))
 }
 
+// authPage parses a standalone auth screen (no app sidebar layout).
+func authPage(name string) *template.Template {
+	return template.Must(template.New(name).Funcs(funcs).
+		ParseFS(templatesFS, "templates/"+name))
+}
+
 // viewBase carries fields the shared layout (sidebar) needs on every page.
 type viewBase struct {
 	Active    string // "spending" | "accounts" | "transactions" | "categories"
-	Connected bool
+	Connected bool   // the active portfolio has a SimpleFIN token
+	Email     string // signed-in user, for the header/logout affordance
 	Error     string
 	Notices   []string // SimpleFIN connection warnings from the last sync
 	LastSync  string   // human-readable time of last sync, "" if never
 }
 
-func (s *Server) accessURL() string {
-	u, _ := s.store.AccessURL()
-	return u
-}
-
-// base builds the per-page layout fields, including the last sync time and any
-// account-health notices from SimpleFIN.
-func (s *Server) base(active string) viewBase {
-	b := viewBase{Active: active, Connected: s.accessURL() != ""}
-	st, err := s.store.SyncStatus()
+// base builds the per-page layout fields for the signed-in user's active
+// portfolio, including the last sync time and any account-health notices.
+func (s *Server) base(r *http.Request, active string) viewBase {
+	pid := portfolioID(r)
+	b := viewBase{Active: active, Connected: pid != ""}
+	if u, err := s.store.UserByID(userID(r)); err == nil {
+		b.Email = u.Email
+	}
+	if pid == "" {
+		return b
+	}
+	st, err := s.store.PortfolioSyncStatus(pid)
 	if err != nil {
 		return b
 	}
@@ -136,6 +200,78 @@ func (s *Server) render(w http.ResponseWriter, name string, v any) {
 	}
 }
 
+// authView backs the standalone login/signup pages.
+type authView struct {
+	Error string
+	Email string
+}
+
+func (s *Server) renderAuth(w http.ResponseWriter, name string, v authView) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := s.pages[name].ExecuteTemplate(w, name, v); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		email := strings.TrimSpace(r.FormValue("email"))
+		u, err := s.store.UserByEmail(email)
+		if err != nil || !auth.CheckPassword(u.PasswordHash, r.FormValue("password")) {
+			s.renderAuth(w, "login", authView{Error: "Invalid email or password", Email: email})
+			return
+		}
+		tok, err := s.auth.CreateToken(u.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		s.auth.SetCookie(w, tok)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	s.renderAuth(w, "login", authView{})
+}
+
+func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		email := strings.TrimSpace(r.FormValue("email"))
+		pw := r.FormValue("password")
+		if email == "" || len(pw) < 8 {
+			s.renderAuth(w, "signup", authView{Error: "Email and an 8+ character password are required", Email: email})
+			return
+		}
+		hash, err := auth.HashPassword(pw)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		u, err := s.store.CreateUser(email, hash)
+		if err == store.ErrEmailTaken {
+			s.renderAuth(w, "signup", authView{Error: "That email is already registered", Email: email})
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		tok, err := s.auth.CreateToken(u.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		s.auth.SetCookie(w, tok)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	s.renderAuth(w, "signup", authView{})
+}
+
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	s.auth.ClearCookie(w)
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimSpace(r.FormValue("token"))
 	if token == "" {
@@ -147,20 +283,27 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	if err := s.store.SetAccessURL(access); err != nil {
+	pid, err := s.store.CreatePortfolio("", access)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := syncer.Sync(s.store, access); err != nil {
+	if err := s.store.AddMember(pid, userID(r), "owner"); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := syncer.Sync(s.store, pid, access); err != nil {
 		log.Printf("initial sync: %v", err)
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
-	if access := s.accessURL(); access != "" {
-		if err := syncer.Sync(s.store, access); err != nil {
-			log.Printf("manual sync: %v", err)
+	if pid := portfolioID(r); pid != "" {
+		if p, err := s.store.PortfolioByID(pid); err == nil && p.AccessURL != "" {
+			if err := syncer.Sync(s.store, pid, p.AccessURL); err != nil {
+				log.Printf("manual sync: %v", err)
+			}
 		}
 	}
 	http.Redirect(w, r, orDefault(r.Header.Get("Referer"), "/"), http.StatusSeeOther)

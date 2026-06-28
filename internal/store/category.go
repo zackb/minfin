@@ -55,13 +55,13 @@ var defaultCategories = []Category{
 	{"Transfer", "", true},
 }
 
-// seedCategories inserts the defaults on a fresh DB. INSERT OR IGNORE so a
-// user's renames/deletes/additions survive restarts.
-func (s *Store) seedCategories() error {
+// seedCategories inserts the defaults for a new portfolio. INSERT OR IGNORE so a
+// user's renames/deletes/additions survive re-seeds.
+func (s *Store) seedCategories(portfolioID string) error {
 	for i, c := range defaultCategories {
 		if _, err := s.db.Exec(
-			`INSERT OR IGNORE INTO categories(name, color, exclude) VALUES(?,?,?)`,
-			c.Name, palette[i%len(palette)], boolToInt(c.Exclude)); err != nil {
+			`INSERT OR IGNORE INTO categories(portfolio_id, name, color, exclude) VALUES(?,?,?,?)`,
+			portfolioID, c.Name, palette[i%len(palette)], boolToInt(c.Exclude)); err != nil {
 			return err
 		}
 	}
@@ -75,8 +75,9 @@ func boolToInt(b bool) int {
 	return 0
 }
 
-func (s *Store) Categories() ([]Category, error) {
-	rows, err := s.db.Query(`SELECT name, color, exclude FROM categories ORDER BY name`)
+func (s *Store) Categories(portfolioID string) ([]Category, error) {
+	rows, err := s.db.Query(
+		`SELECT name, color, exclude FROM categories WHERE portfolio_id=? ORDER BY name`, portfolioID)
 	if err != nil {
 		return nil, err
 	}
@@ -94,72 +95,73 @@ func (s *Store) Categories() ([]Category, error) {
 	return out, rows.Err()
 }
 
-// categoryExists reports whether name is a known category (or the empty,
-// uncategorized value).
-func (s *Store) categoryExists(name string) (bool, error) {
+// categoryExists reports whether name is a known category in the portfolio (or
+// the empty, uncategorized value).
+func (s *Store) categoryExists(portfolioID, name string) (bool, error) {
 	if name == "" {
 		return true, nil
 	}
 	var n int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM categories WHERE name=?`, name).Scan(&n)
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM categories WHERE portfolio_id=? AND name=?`,
+		portfolioID, name).Scan(&n)
 	return n > 0, err
 }
 
 // AddCategory creates a category, assigning the next palette color. No-op if it
 // already exists.
-func (s *Store) AddCategory(name string) error {
+func (s *Store) AddCategory(portfolioID, name string) error {
 	var n int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM categories`).Scan(&n); err != nil {
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM categories WHERE portfolio_id=?`, portfolioID).Scan(&n); err != nil {
 		return err
 	}
-	_, err := s.db.Exec(`INSERT OR IGNORE INTO categories(name, color) VALUES(?,?)`,
-		name, palette[n%len(palette)])
+	_, err := s.db.Exec(`INSERT OR IGNORE INTO categories(portfolio_id, name, color) VALUES(?,?,?)`,
+		portfolioID, name, palette[n%len(palette)])
 	return err
 }
 
 // SetCategoryExclude flags (or unflags) a category to leave it out of the
 // spend/income totals and the spending screen.
-func (s *Store) SetCategoryExclude(name string, exclude bool) error {
-	_, err := s.db.Exec(`UPDATE categories SET exclude=? WHERE name=?`,
-		boolToInt(exclude), name)
+func (s *Store) SetCategoryExclude(portfolioID, name string, exclude bool) error {
+	_, err := s.db.Exec(`UPDATE categories SET exclude=? WHERE portfolio_id=? AND name=?`,
+		boolToInt(exclude), portfolioID, name)
 	return err
 }
 
 // DeleteCategory removes a category, clearing it from any transactions and rules.
-func (s *Store) DeleteCategory(name string) error {
+func (s *Store) DeleteCategory(portfolioID, name string) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(`UPDATE transactions SET category='' WHERE category=?`, name); err != nil {
+	if _, err := tx.Exec(`UPDATE transactions SET category='' WHERE portfolio_id=? AND category=?`, portfolioID, name); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM category_rules WHERE category=?`, name); err != nil {
+	if _, err := tx.Exec(`DELETE FROM category_rules WHERE portfolio_id=? AND category=?`, portfolioID, name); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM categories WHERE name=?`, name); err != nil {
+	if _, err := tx.Exec(`DELETE FROM categories WHERE portfolio_id=? AND name=?`, portfolioID, name); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
 // SetTxnCategory assigns a category to one transaction. category must be a known
-// category or "" to clear.
-func (s *Store) SetTxnCategory(id, category string) error {
-	ok, err := s.categoryExists(category)
+// category in the portfolio or "" to clear.
+func (s *Store) SetTxnCategory(portfolioID, id, category string) error {
+	ok, err := s.categoryExists(portfolioID, category)
 	if err != nil {
 		return err
 	}
 	if !ok {
 		return ErrUnknownCategory
 	}
-	_, err = s.db.Exec(`UPDATE transactions SET category=? WHERE id=?`, category, id)
+	_, err = s.db.Exec(`UPDATE transactions SET category=? WHERE portfolio_id=? AND id=?`, category, portfolioID, id)
 	return err
 }
 
-func (s *Store) Rules() ([]Rule, error) {
-	rows, err := s.db.Query(`SELECT id, pattern, category FROM category_rules ORDER BY id`)
+func (s *Store) Rules(portfolioID string) ([]Rule, error) {
+	rows, err := s.db.Query(`SELECT id, pattern, category FROM category_rules WHERE portfolio_id=? ORDER BY id`, portfolioID)
 	if err != nil {
 		return nil, err
 	}
@@ -175,11 +177,11 @@ func (s *Store) Rules() ([]Rule, error) {
 	return out, rows.Err()
 }
 
-// AddRule remembers a payee→category mapping. One rule per pattern: re-adding an
-// existing pattern updates its category instead of duplicating. Validates the
-// category exists.
-func (s *Store) AddRule(pattern, category string) error {
-	ok, err := s.categoryExists(category)
+// AddRule remembers a payee→category mapping. One rule per pattern per portfolio:
+// re-adding an existing pattern updates its category instead of duplicating.
+// Validates the category exists.
+func (s *Store) AddRule(portfolioID, pattern, category string) error {
+	ok, err := s.categoryExists(portfolioID, category)
 	if err != nil {
 		return err
 	}
@@ -187,8 +189,8 @@ func (s *Store) AddRule(pattern, category string) error {
 		return ErrUnknownCategory
 	}
 	_, err = s.db.Exec(
-		`INSERT INTO category_rules(pattern, category) VALUES(?,?)
-		 ON CONFLICT(pattern) DO UPDATE SET category=excluded.category`, pattern, category)
+		`INSERT INTO category_rules(portfolio_id, pattern, category) VALUES(?,?,?)
+		 ON CONFLICT(portfolio_id, pattern) DO UPDATE SET category=excluded.category`, portfolioID, pattern, category)
 	return err
 }
 
@@ -204,37 +206,40 @@ func (s *Store) RuleMatches(payee string, rules []Rule) bool {
 	return false
 }
 
-func (s *Store) DeleteRule(id int64) error {
-	_, err := s.db.Exec(`DELETE FROM category_rules WHERE id=?`, id)
+func (s *Store) DeleteRule(portfolioID string, id int64) error {
+	_, err := s.db.Exec(`DELETE FROM category_rules WHERE portfolio_id=? AND id=?`, portfolioID, id)
 	return err
 }
 
-// ApplyRules categorizes transactions from the saved rules and returns how many
-// rows were updated. Each matching transaction is set to its longest-matching
-// rule's category, so the most specific match wins (e.g. "PayPal Instant
-// Transfer" beats "Transfer"); ties break by rule id.
+// ApplyRules categorizes a portfolio's transactions from its saved rules and
+// returns how many rows were updated. Each matching transaction is set to its
+// longest-matching rule's category, so the most specific match wins (e.g. "PayPal
+// Instant Transfer" beats "Transfer"); ties break by rule id.
 //
 // When overwrite is false it is fill-only: only uncategorized rows are touched,
 // preserving manual and existing categories (the on-sync auto-categorization).
 // When overwrite is true every transaction whose payee matches a rule is reset
 // to the rule's category, even if already categorized (the manual "Recategorize
 // past transactions" button).
-func (s *Store) ApplyRules(overwrite bool) (int, error) {
-	where := "category = '' AND "
+func (s *Store) ApplyRules(portfolioID string, overwrite bool) (int, error) {
+	fill := "category = '' AND "
 	if overwrite {
-		where = ""
+		fill = ""
 	}
 	res, err := s.db.Exec(
 		`UPDATE transactions
 		 SET category = (
 		   SELECT r.category FROM category_rules r
-		   WHERE transactions.payee LIKE '%'||r.pattern||'%'
+		   WHERE r.portfolio_id = transactions.portfolio_id
+		     AND transactions.payee LIKE '%'||r.pattern||'%'
 		   ORDER BY LENGTH(r.pattern) DESC, r.id ASC
 		   LIMIT 1
 		 )
-		 WHERE ` + where + `EXISTS (
-		   SELECT 1 FROM category_rules r WHERE transactions.payee LIKE '%'||r.pattern||'%'
-		 )`)
+		 WHERE portfolio_id = ? AND `+fill+`EXISTS (
+		   SELECT 1 FROM category_rules r
+		   WHERE r.portfolio_id = transactions.portfolio_id
+		     AND transactions.payee LIKE '%'||r.pattern||'%'
+		 )`, portfolioID)
 	if err != nil {
 		return 0, err
 	}
@@ -244,25 +249,26 @@ func (s *Store) ApplyRules(overwrite bool) (int, error) {
 
 // SpendByCategory aggregates debit spend (amount<0) by category over [start,end),
 // excluding categories flagged exclude. Empty categories bucket as "Uncategorized".
-func (s *Store) SpendByCategory(start, end time.Time) ([]CategoryStat, error) {
-	return s.byCategory(start, end, "t.amount_cents < 0", "-SUM(t.amount_cents)")
+func (s *Store) SpendByCategory(portfolioID string, start, end time.Time) ([]CategoryStat, error) {
+	return s.byCategory(portfolioID, start, end, "t.amount_cents < 0", "-SUM(t.amount_cents)")
 }
 
 // IncomeByCategory aggregates credit income (amount>0) by category over [start,end).
-func (s *Store) IncomeByCategory(start, end time.Time) ([]CategoryStat, error) {
-	return s.byCategory(start, end, "t.amount_cents > 0", "SUM(t.amount_cents)")
+func (s *Store) IncomeByCategory(portfolioID string, start, end time.Time) ([]CategoryStat, error) {
+	return s.byCategory(portfolioID, start, end, "t.amount_cents > 0", "SUM(t.amount_cents)")
 }
 
-func (s *Store) byCategory(start, end time.Time, sign, sum string) ([]CategoryStat, error) {
+func (s *Store) byCategory(portfolioID string, start, end time.Time, sign, sum string) ([]CategoryStat, error) {
 	rows, err := s.db.Query(
 		`SELECT COALESCE(NULLIF(t.category,''), 'Uncategorized') AS cat,
 		        COALESCE(c.color, '') AS color,
 		        COUNT(*) AS n, `+sum+` AS amt
-		 FROM transactions t LEFT JOIN categories c ON c.name = t.category
-		 WHERE t.posted >= ? AND t.posted < ? AND `+sign+`
+		 FROM transactions t
+		      LEFT JOIN categories c ON c.portfolio_id = t.portfolio_id AND c.name = t.category
+		 WHERE t.portfolio_id = ? AND t.posted >= ? AND t.posted < ? AND `+sign+`
 		       AND COALESCE(c.exclude, 0) = 0
 		 GROUP BY cat
-		 ORDER BY amt DESC`, start.Unix(), end.Unix())
+		 ORDER BY amt DESC`, portfolioID, start.Unix(), end.Unix())
 	if err != nil {
 		return nil, err
 	}

@@ -8,13 +8,14 @@ import (
 // TxnFilter selects and pages transactions. Zero Start/End is treated as
 // unbounded on that side by the caller (the web layer defaults to last 30 days).
 type TxnFilter struct {
-	Start, End time.Time // [Start, End)
-	AccountID  string    // "" = all accounts
-	Category   string    // "" = all, "none" = uncategorized, else exact match
-	Direction  string    // "all" | "debit" | "credit"
-	Query      string    // substring match on payee/description
-	Limit      int       // page size (default 100)
-	Offset     int
+	PortfolioID string    // required: scopes the query to one portfolio
+	Start, End  time.Time // [Start, End)
+	AccountID   string    // "" = all accounts
+	Category    string    // "" = all, "none" = uncategorized, else exact match
+	Direction   string    // "all" | "debit" | "credit"
+	Query       string    // substring match on payee/description
+	Limit       int       // page size (default 100)
+	Offset      int
 }
 
 type TxnRow struct {
@@ -32,8 +33,8 @@ type TxnRow struct {
 // Transactions returns rows matching the filter (newest first) plus hasNext,
 // computed by fetching one extra row instead of a separate COUNT.
 func (s *Store) Transactions(f TxnFilter) (rows []TxnRow, hasNext bool, err error) {
-	where := []string{"t.posted >= ?", "t.posted < ?"}
-	args := []any{f.Start.Unix(), f.End.Unix()}
+	where := []string{"t.portfolio_id = ?", "t.posted >= ?", "t.posted < ?"}
+	args := []any{f.PortfolioID, f.Start.Unix(), f.End.Unix()}
 
 	if f.AccountID != "" {
 		where = append(where, "t.account_id = ?")
@@ -68,7 +69,7 @@ func (s *Store) Transactions(f TxnFilter) (rows []TxnRow, hasNext bool, err erro
 
 	q := `SELECT t.id, t.posted, COALESCE(NULLIF(a.nickname,''), NULLIF(a.name,''), t.account_id),
 	             t.payee, t.description, t.category, t.amount_cents, t.pending
-	      FROM transactions t LEFT JOIN accounts a ON a.id = t.account_id
+	      FROM transactions t LEFT JOIN accounts a ON a.portfolio_id = t.portfolio_id AND a.id = t.account_id
 	      WHERE ` + strings.Join(where, " AND ") + `
 	      ORDER BY t.posted DESC
 	      LIMIT ? OFFSET ?`

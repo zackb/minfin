@@ -25,14 +25,15 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	v := homeView{viewBase: s.base("dashboard")}
+	v := homeView{viewBase: s.base(r, "dashboard")}
 	if !v.Connected {
 		s.render(w, "home", v)
 		return
 	}
 
+	pid := portfolioID(r)
 	now := time.Now()
-	accts, err := s.store.Accounts(now)
+	accts, err := s.store.Accounts(pid, now)
 	if err != nil {
 		v.Error = err.Error()
 	}
@@ -40,13 +41,13 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	v.Assets, v.Liabilities, v.NetWorth = summarize(accts)
 
 	start, end := daterange.Resolve("last-30-days", now)
-	if series, err := s.store.SpendingSeries(start, end, "daily", false); err == nil {
+	if series, err := s.store.SpendingSeries(pid, start, end, "daily", false); err == nil {
 		j, _ := json.Marshal(series)
 		v.ChartJSON = template.JS(j)
 	} else {
 		v.Error = err.Error()
 	}
-	if v.Payees, err = s.store.TopPayees(start, end, 8); err != nil {
+	if v.Payees, err = s.store.TopPayees(pid, start, end, 8); err != nil {
 		v.Error = err.Error()
 	}
 

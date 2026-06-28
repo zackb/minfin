@@ -20,9 +20,9 @@ type accountsView struct {
 }
 
 func (s *Server) handleAccounts(w http.ResponseWriter, r *http.Request) {
-	v := accountsView{viewBase: s.base("accounts"), Types: store.AccountTypes}
+	v := accountsView{viewBase: s.base(r, "accounts"), Types: store.AccountTypes}
 	if v.Connected {
-		accts, err := s.store.Accounts(time.Now())
+		accts, err := s.store.Accounts(portfolioID(r), time.Now())
 		if err != nil {
 			v.Error = err.Error()
 		}
@@ -56,7 +56,7 @@ func (s *Server) handleAccountType(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid account or type", http.StatusBadRequest)
 		return
 	}
-	if err := s.store.SetAccountType(id, typ); err != nil {
+	if err := s.store.SetAccountType(portfolioID(r), id, typ); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -77,7 +77,7 @@ func (s *Server) handleAccountAssetValue(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	cents := int64(math.Round(dollars * 100))
-	if err := s.store.SetAccountAssetValue(id, cents); err != nil {
+	if err := s.store.SetAccountAssetValue(portfolioID(r), id, cents); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -91,7 +91,7 @@ func (s *Server) handleAccountNickname(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	nick := strings.TrimSpace(r.FormValue("nickname"))
-	if err := s.store.SetAccountNickname(id, nick); err != nil {
+	if err := s.store.SetAccountNickname(portfolioID(r), id, nick); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

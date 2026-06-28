@@ -8,18 +8,34 @@ import (
 	"github.com/zackb/minfin/internal/simplefin"
 )
 
+// testPID is the portfolio every seeded fixture lives under.
+const testPID = "p1"
+
 func at(s string) int64 {
 	ts, _ := time.Parse(time.RFC3339, s)
 	return ts.Unix()
 }
 
-// seedStore builds a temp DB with two accounts and a mix of debits/credits.
+func openStore(t *testing.T) *Store {
+	t.Helper()
+	s, err := Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+// seedStore builds a temp DB with one portfolio (testPID) holding two accounts
+// and a mix of debits/credits.
 // Spending (debits) by day: 06-10 => 15.00, 06-11 => 27.50.
 // Coffee debits total 22.50 (x3), Grocer 20.00 (x1).
 func seedStore(t *testing.T) *Store {
 	t.Helper()
-	s, err := Open(filepath.Join(t.TempDir(), "test.db"))
-	if err != nil {
+	s := openStore(t)
+	if _, err := s.db.Exec(`INSERT INTO portfolios(id, created_at) VALUES(?, 0)`, testPID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.seedCategories(testPID); err != nil {
 		t.Fatal(err)
 	}
 	set := simplefin.AccountSet{Accounts: []simplefin.Account{
@@ -40,7 +56,7 @@ func seedStore(t *testing.T) *Store {
 			},
 		},
 	}}
-	if err := s.SaveAccountSet(set); err != nil {
+	if err := s.SaveAccountSet(testPID, set); err != nil {
 		t.Fatal(err)
 	}
 	return s
@@ -53,7 +69,7 @@ var (
 
 func TestSpendingSeries(t *testing.T) {
 	s := seedStore(t)
-	series, err := s.SpendingSeries(rangeStart, rangeEnd, "daily", false)
+	series, err := s.SpendingSeries(testPID, rangeStart, rangeEnd, "daily", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +90,7 @@ func TestSpendingRangesMonthly(t *testing.T) {
 	s := seedStore(t)
 	start := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 	end := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
-	series, err := s.SpendingSeries(start, end, "monthly", false)
+	series, err := s.SpendingSeries(testPID, start, end, "monthly", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,17 +101,14 @@ func TestSpendingRangesMonthly(t *testing.T) {
 
 func TestSpendingRangesWeekly(t *testing.T) {
 	s := seedStore(t)
-	// Window covering the week of the seed data; no clamping.
 	start := time.Date(2026, 6, 8, 0, 0, 0, 0, time.UTC)
 	end := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
-	series, err := s.SpendingSeries(start, end, "weekly", false)
+	series, err := s.SpendingSeries(testPID, start, end, "weekly", false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Expected Monday-start of the week containing the data, computed the same
-	// way the app does, to validate the SQL produces the same Monday.
 	d := time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC)
-	monday := d.AddDate(0, 0, -((int(d.Weekday())+6)%7))
+	monday := d.AddDate(0, 0, -((int(d.Weekday()) + 6) % 7))
 	want := Bucket{monday.Format(dateLayout), monday.AddDate(0, 0, 6).Format(dateLayout)}
 	if len(series.Ranges) != 1 || series.Ranges[0] != want {
 		t.Fatalf("weekly ranges = %+v, want one %+v", series.Ranges, want)
@@ -104,10 +117,9 @@ func TestSpendingRangesWeekly(t *testing.T) {
 
 func TestSpendingRangesClamp(t *testing.T) {
 	s := seedStore(t)
-	// Monthly bucket but a sub-month window: both ends clamp to the window.
 	start := time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC)
 	end := time.Date(2026, 6, 12, 0, 0, 0, 0, time.UTC) // exclusive
-	series, err := s.SpendingSeries(start, end, "monthly", false)
+	series, err := s.SpendingSeries(testPID, start, end, "monthly", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +130,7 @@ func TestSpendingRangesClamp(t *testing.T) {
 
 func TestTopPayees(t *testing.T) {
 	s := seedStore(t)
-	p, err := s.TopPayees(rangeStart, rangeEnd, 10)
+	p, err := s.TopPayees(testPID, rangeStart, rangeEnd, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +143,7 @@ func TestTopPayees(t *testing.T) {
 func TestAccounts(t *testing.T) {
 	s := seedStore(t)
 	now := time.Date(2026, 6, 12, 0, 0, 0, 0, time.UTC)
-	accts, err := s.Accounts(now)
+	accts, err := s.Accounts(testPID, now)
 	if err != nil {
 		t.Fatal(err)
 	}
