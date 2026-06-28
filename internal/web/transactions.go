@@ -17,6 +17,7 @@ type transactionsView struct {
 	From       string // yyyy-mm-dd, for the date inputs
 	To         string
 	AccountID  string
+	Category   string
 	Direction  string
 	Query      string
 	Accounts   []store.AccountRef
@@ -32,6 +33,7 @@ func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 	v := transactionsView{
 		viewBase:  s.base("transactions"),
 		AccountID: q.Get("account"),
+		Category:  q.Get("category"),
 		Direction: orDefault(q.Get("dir"), "all"),
 		Query:     q.Get("q"),
 	}
@@ -68,6 +70,7 @@ func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 		Start:     start,
 		End:       end,
 		AccountID: v.AccountID,
+		Category:  v.Category,
 		Direction: v.Direction,
 		Query:     v.Query,
 		Limit:     txnPageSize,
@@ -90,6 +93,7 @@ func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 	setIf(params, "from", v.From)
 	setIf(params, "to", v.To)
 	setIf(params, "account", v.AccountID)
+	setIf(params, "category", v.Category)
 	if v.Direction != "all" {
 		params.Set("dir", v.Direction)
 	}

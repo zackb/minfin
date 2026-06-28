@@ -2,7 +2,6 @@ package store
 
 import (
 	"errors"
-	"sort"
 	"strings"
 	"time"
 )
@@ -202,34 +201,36 @@ func (s *Store) DeleteRule(id int64) error {
 	return err
 }
 
-// ApplyRules categorizes uncategorized transactions from the saved rules and
-// returns how many rows were updated. Fill-only (category=''): never overwrites
-// a manual or existing category, and idempotent. Rules apply longest-pattern
-// first, so the most specific match wins (e.g. "PayPal Instant Transfer" beats
-// "Transfer"); ties break by id. Backs both the on-sync auto-categorization and
-// the manual "recategorize" button.
-func (s *Store) ApplyRules() (int, error) {
-	rules, err := s.Rules()
+// ApplyRules categorizes transactions from the saved rules and returns how many
+// rows were updated. Each matching transaction is set to its longest-matching
+// rule's category, so the most specific match wins (e.g. "PayPal Instant
+// Transfer" beats "Transfer"); ties break by rule id.
+//
+// When overwrite is false it is fill-only: only uncategorized rows are touched,
+// preserving manual and existing categories (the on-sync auto-categorization).
+// When overwrite is true every transaction whose payee matches a rule is reset
+// to the rule's category, even if already categorized (the manual "Recategorize
+// past transactions" button).
+func (s *Store) ApplyRules(overwrite bool) (int, error) {
+	where := "category = '' AND "
+	if overwrite {
+		where = ""
+	}
+	res, err := s.db.Exec(
+		`UPDATE transactions
+		 SET category = (
+		   SELECT r.category FROM category_rules r
+		   WHERE transactions.payee LIKE '%'||r.pattern||'%'
+		   ORDER BY LENGTH(r.pattern) DESC, r.id ASC
+		   LIMIT 1
+		 )
+		 WHERE ` + where + `EXISTS (
+		   SELECT 1 FROM category_rules r WHERE transactions.payee LIKE '%'||r.pattern||'%'
+		 )`)
 	if err != nil {
 		return 0, err
 	}
-	// Longest pattern wins: the fill-only guard means whichever rule runs first
-	// claims the row, so applying the most specific (longest) patterns first
-	// keeps a broad rule from stealing transactions a narrow one should own.
-	sort.SliceStable(rules, func(i, j int) bool {
-		return len(rules[i].Pattern) > len(rules[j].Pattern)
-	})
-	var n int64
-	for _, r := range rules {
-		res, err := s.db.Exec(
-			`UPDATE transactions SET category=? WHERE category='' AND payee LIKE '%'||?||'%'`,
-			r.Category, r.Pattern)
-		if err != nil {
-			return int(n), err
-		}
-		c, _ := res.RowsAffected()
-		n += c
-	}
+	n, _ := res.RowsAffected()
 	return int(n), nil
 }
 

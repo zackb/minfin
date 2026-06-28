@@ -10,6 +10,7 @@ import (
 type TxnFilter struct {
 	Start, End time.Time // [Start, End)
 	AccountID  string    // "" = all accounts
+	Category   string    // "" = all, "none" = uncategorized, else exact match
 	Direction  string    // "all" | "debit" | "credit"
 	Query      string    // substring match on payee/description
 	Limit      int       // page size (default 100)
@@ -37,6 +38,15 @@ func (s *Store) Transactions(f TxnFilter) (rows []TxnRow, hasNext bool, err erro
 	if f.AccountID != "" {
 		where = append(where, "t.account_id = ?")
 		args = append(args, f.AccountID)
+	}
+	switch f.Category {
+	case "":
+		// all categories
+	case "none":
+		where = append(where, "COALESCE(t.category,'') = ''")
+	default:
+		where = append(where, "t.category = ?")
+		args = append(args, f.Category)
 	}
 	switch f.Direction {
 	case "debit":

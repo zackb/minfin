@@ -31,8 +31,9 @@ func Sync(s *store.Store, accessURL string) error {
 	if err := s.SaveAccountSet(set); err != nil {
 		return err
 	}
-	// Auto-categorize newly synced transactions from the saved rules.
-	if n, err := s.ApplyRules(); err != nil {
+	// Auto-categorize newly synced transactions from the saved rules. Fill-only
+	// so a sync never clobbers a manual category.
+	if n, err := s.ApplyRules(false); err != nil {
 		log.Printf("apply rules: %v", err)
 	} else if n > 0 {
 		log.Printf("categorized %d transactions", n)

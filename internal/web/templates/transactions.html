@@ -13,6 +13,16 @@
         {{end}}
       </select>
     </div>
+    <div class="f"><label>Category</label>
+      <select name="category">
+        <option value="">All categories</option>
+        {{$c := .Category}}
+        <option value="none" {{if eq $c "none"}}selected{{end}}>Uncategorized</option>
+        {{range .Categories}}
+        <option value="{{.Name}}" {{if eq .Name $c}}selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+    </div>
     <div class="f"><label>Type</label>
       <select name="dir">
         {{$d := .Direction}}

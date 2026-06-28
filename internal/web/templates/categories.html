@@ -85,7 +85,8 @@
     {{end}}
   </table>
   {{end}}
-  <form method="post" action="/categories/recategorize" class="controls">
+  <form method="post" action="/categories/recategorize" class="controls"
+        onsubmit="return confirm('Re-apply rules to all past transactions? This overwrites the category on any transaction whose payee matches a rule, including ones you set by hand.')">
     <button type="submit" class="primary">Recategorize past transactions</button>
   </form>
 </div>

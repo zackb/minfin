@@ -16,7 +16,7 @@ func TestApplyRulesFillOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n, err := s.ApplyRules()
+	n, err := s.ApplyRules(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func TestApplyRulesFillOnly(t *testing.T) {
 		t.Fatalf("applied %d, want 2", n)
 	}
 	// Idempotent: re-running changes nothing.
-	if n, err := s.ApplyRules(); err != nil || n != 0 {
+	if n, err := s.ApplyRules(false); err != nil || n != 0 {
 		t.Fatalf("re-apply = %d, %v; want 0, nil", n, err)
 	}
 
@@ -67,7 +67,7 @@ func TestApplyRulesLongestMatchWins(t *testing.T) {
 	if err := s.AddRule("PayPal Instant Transfer", "PayPal"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.ApplyRules(); err != nil {
+	if _, err := s.ApplyRules(false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -89,6 +89,35 @@ func TestApplyRulesLongestMatchWins(t *testing.T) {
 	}
 	if got["x2"] != "PayPal" { // longest pattern wins, not "Transfer"
 		t.Errorf("x2 = %q, want PayPal", got["x2"])
+	}
+}
+
+func TestApplyRulesOverwrite(t *testing.T) {
+	s := seedStore(t) // t1/t2/t5 payee "Coffee"
+	if err := s.AddRule("Coffee", "Restaurants"); err != nil {
+		t.Fatal(err)
+	}
+	// t2 is mis-categorized; fill-only would leave it, overwrite must fix it.
+	if err := s.SetTxnCategory("t2", "Travel"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.ApplyRules(true); err != nil {
+		t.Fatal(err)
+	}
+	var cat string
+	if err := s.db.QueryRow(`SELECT category FROM transactions WHERE id='t2'`).Scan(&cat); err != nil {
+		t.Fatal(err)
+	}
+	if cat != "Restaurants" {
+		t.Fatalf("t2 after overwrite = %q, want Restaurants", cat)
+	}
+	// A payee with no matching rule is left alone even in overwrite mode.
+	if err := s.db.QueryRow(`SELECT category FROM transactions WHERE id='t3'`).Scan(&cat); err != nil {
+		t.Fatal(err)
+	}
+	if cat != "" {
+		t.Fatalf("t3 (Grocer, no rule) = %q, want empty", cat)
 	}
 }
 

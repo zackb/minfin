@@ -159,7 +159,9 @@ func (s *Server) handleRuleDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRecategorize(w http.ResponseWriter, r *http.Request) {
-	if _, err := s.store.ApplyRules(); err != nil {
+	// Manual button overwrites: re-apply rules over already-categorized rows so
+	// stale/mis-matched categories get corrected.
+	if _, err := s.store.ApplyRules(true); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
