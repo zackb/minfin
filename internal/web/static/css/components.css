@@ -128,6 +128,38 @@ th {
 .welcome .tagline { margin: 0 0 1rem; font-size: 1.05rem; }
 .welcome .controls { justify-content: center; margin-top: .5rem; }
 
+/* Standalone auth screens (login/signup). */
+.auth-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: .5rem;
+  width: 100%;
+  max-width: 380px;
+  padding: 2.5rem;
+}
+.auth-card .logo { width: 96px; height: 96px; object-fit: contain; }
+.auth-card .wordmark { font-size: 1.8rem; margin: .4rem 0 0; letter-spacing: 1px; }
+.auth-card .tagline { margin: 0 0 1rem; }
+.auth-form { display: flex; flex-direction: column; gap: .75rem; width: 100%; margin-bottom: .5rem; }
+.auth-form input {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: .65rem .8rem;
+  width: 100%;
+}
+.auth-form button { width: 100%; }
+
 /* Dashboard grid */
 .grid {
   display: grid;

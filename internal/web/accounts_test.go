@@ -8,34 +8,73 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/zackb/minfin/internal/auth"
 	"github.com/zackb/minfin/internal/simplefin"
 	"github.com/zackb/minfin/internal/store"
 )
 
-func newTestServer(t *testing.T) *Server {
+// env is an authenticated test fixture: a server, a signed-in user's portfolio
+// id, and the auth cookie to attach to requests.
+type env struct {
+	s      *Server
+	pid    string
+	cookie *http.Cookie
+}
+
+func newEnv(t *testing.T) *env {
 	t.Helper()
 	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetAccessURL("http://example.test/simplefin"); err != nil {
+	authSvc, err := auth.New("test-secret", true)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SaveAccountSet(simplefin.AccountSet{Accounts: []simplefin.Account{
+	hash, _ := auth.HashPassword("password123")
+	u, err := st.CreateUser("user@test.example", hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pid, err := st.CreatePortfolio("", "http://example.test/simplefin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AddMember(pid, u.ID, "owner"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveAccountSet(pid, simplefin.AccountSet{Accounts: []simplefin.Account{
 		{ID: "a1", Name: "Checking", Balance: "100.00"},
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	return NewServer(st)
+	tok, err := authSvc.CreateToken(u.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	authSvc.SetCookie(rec, tok)
+	return &env{s: NewServer(st, authSvc), pid: pid, cookie: rec.Result().Cookies()[0]}
 }
 
-func postType(t *testing.T, s *Server, id, typ string) int {
+// get/post issue authenticated requests through the full handler (auth middleware
+// included).
+func get(t *testing.T, e *env, path string) *httptest.ResponseRecorder {
 	t.Helper()
-	body := url.Values{"id": {id}, "type": {typ}}.Encode()
-	req := httptest.NewRequest(http.MethodPost, "/accounts/type", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req.AddCookie(e.cookie)
 	rec := httptest.NewRecorder()
-	s.Handler().ServeHTTP(rec, req)
+	e.s.Handler().ServeHTTP(rec, req)
+	return rec
+}
+
+func post(t *testing.T, e *env, path string, form url.Values) int {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(e.cookie)
+	rec := httptest.NewRecorder()
+	e.s.Handler().ServeHTTP(rec, req)
 	return rec.Code
 }
 
@@ -62,11 +101,11 @@ func TestSummarizeWithAsset(t *testing.T) {
 }
 
 func TestHandleAccountType(t *testing.T) {
-	s := newTestServer(t)
-	if code := postType(t, s, "a1", "bogus"); code != http.StatusBadRequest {
+	e := newEnv(t)
+	if code := post(t, e, "/accounts/type", url.Values{"id": {"a1"}, "type": {"bogus"}}); code != http.StatusBadRequest {
 		t.Errorf("invalid type: got %d, want 400", code)
 	}
-	if code := postType(t, s, "a1", "checking"); code != http.StatusSeeOther {
+	if code := post(t, e, "/accounts/type", url.Values{"id": {"a1"}, "type": {"checking"}}); code != http.StatusSeeOther {
 		t.Errorf("valid type: got %d, want 303", code)
 	}
 }

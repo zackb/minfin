@@ -8,15 +8,15 @@ import (
 
 func TestApplyRulesFillOnly(t *testing.T) {
 	s := seedStore(t) // t1/t2/t5 payee "Coffee", t3 "Grocer"
-	if err := s.AddRule("Coffee", "Restaurants"); err != nil {
+	if err := s.AddRule(testPID, "Coffee", "Restaurants"); err != nil {
 		t.Fatal(err)
 	}
 	// A manual category that ApplyRules must not overwrite.
-	if err := s.SetTxnCategory("t2", "Travel"); err != nil {
+	if err := s.SetTxnCategory(testPID, "t2", "Travel"); err != nil {
 		t.Fatal(err)
 	}
 
-	n, err := s.ApplyRules(false)
+	n, err := s.ApplyRules(testPID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,11 +24,11 @@ func TestApplyRulesFillOnly(t *testing.T) {
 		t.Fatalf("applied %d, want 2", n)
 	}
 	// Idempotent: re-running changes nothing.
-	if n, err := s.ApplyRules(false); err != nil || n != 0 {
+	if n, err := s.ApplyRules(testPID, false); err != nil || n != 0 {
 		t.Fatalf("re-apply = %d, %v; want 0, nil", n, err)
 	}
 
-	spend, err := s.SpendByCategory(rangeStart, rangeEnd)
+	spend, err := s.SpendByCategory(testPID, rangeStart, rangeEnd)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,9 +49,9 @@ func TestApplyRulesFillOnly(t *testing.T) {
 
 func TestApplyRulesLongestMatchWins(t *testing.T) {
 	s := seedStore(t)
-	s.AddCategory("PayPal")
+	s.AddCategory(testPID, "PayPal")
 	// Two transactions: one plain "Transfer", one "PayPal Instant Transfer".
-	if err := s.SaveAccountSet(simplefin.AccountSet{Accounts: []simplefin.Account{{
+	if err := s.SaveAccountSet(testPID, simplefin.AccountSet{Accounts: []simplefin.Account{{
 		ID: "a1", Name: "Checking", Balance: "1000.00",
 		Transactions: []simplefin.Transaction{
 			{ID: "x1", Posted: at("2026-06-10T12:00:00Z"), Amount: "-100.00", Payee: "Transfer"},
@@ -61,13 +61,13 @@ func TestApplyRulesLongestMatchWins(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Add the shorter, more general rule FIRST to prove order-independence.
-	if err := s.AddRule("Transfer", "Transfer"); err != nil {
+	if err := s.AddRule(testPID, "Transfer", "Transfer"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AddRule("PayPal Instant Transfer", "PayPal"); err != nil {
+	if err := s.AddRule(testPID, "PayPal Instant Transfer", "PayPal"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.ApplyRules(false); err != nil {
+	if _, err := s.ApplyRules(testPID, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -94,15 +94,15 @@ func TestApplyRulesLongestMatchWins(t *testing.T) {
 
 func TestApplyRulesOverwrite(t *testing.T) {
 	s := seedStore(t) // t1/t2/t5 payee "Coffee"
-	if err := s.AddRule("Coffee", "Restaurants"); err != nil {
+	if err := s.AddRule(testPID, "Coffee", "Restaurants"); err != nil {
 		t.Fatal(err)
 	}
 	// t2 is mis-categorized; fill-only would leave it, overwrite must fix it.
-	if err := s.SetTxnCategory("t2", "Travel"); err != nil {
+	if err := s.SetTxnCategory(testPID, "t2", "Travel"); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := s.ApplyRules(true); err != nil {
+	if _, err := s.ApplyRules(testPID, true); err != nil {
 		t.Fatal(err)
 	}
 	var cat string
@@ -123,17 +123,17 @@ func TestApplyRulesOverwrite(t *testing.T) {
 
 func TestSetTxnCategoryRejectsUnknown(t *testing.T) {
 	s := seedStore(t)
-	if err := s.SetTxnCategory("t1", "Nonexistent"); err != ErrUnknownCategory {
+	if err := s.SetTxnCategory(testPID, "t1", "Nonexistent"); err != ErrUnknownCategory {
 		t.Fatalf("got %v, want ErrUnknownCategory", err)
 	}
 }
 
 func TestTransferExcludedFromSpend(t *testing.T) {
 	s := seedStore(t)
-	if err := s.SetTxnCategory("t3", "Transfer"); err != nil { // Transfer is exclude=1
+	if err := s.SetTxnCategory(testPID, "t3", "Transfer"); err != nil { // Transfer is exclude=1
 		t.Fatal(err)
 	}
-	spend, err := s.SpendByCategory(rangeStart, rangeEnd)
+	spend, err := s.SpendByCategory(testPID, rangeStart, rangeEnd)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,18 +146,18 @@ func TestTransferExcludedFromSpend(t *testing.T) {
 
 func TestSetCategoryExcludeHidesFromSpending(t *testing.T) {
 	s := seedStore(t)
-	s.AddCategory("Cards")
+	s.AddCategory(testPID, "Cards")
 	// Put all the Coffee debits (t1 $10, t2 $5, t5 $7.50) into Cards, then exclude it.
 	for _, id := range []string{"t1", "t2", "t5"} {
-		if err := s.SetTxnCategory(id, "Cards"); err != nil {
+		if err := s.SetTxnCategory(testPID, id, "Cards"); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := s.SetCategoryExclude("Cards", true); err != nil {
+	if err := s.SetCategoryExclude(testPID, "Cards", true); err != nil {
 		t.Fatal(err)
 	}
 
-	spend, err := s.SpendByCategory(rangeStart, rangeEnd)
+	spend, err := s.SpendByCategory(testPID, rangeStart, rangeEnd)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestSetCategoryExcludeHidesFromSpending(t *testing.T) {
 	}
 
 	// Spending screen: only Grocer's $20 (2026-06-11) remains.
-	series, err := s.SpendingSeries(rangeStart, rangeEnd, "daily", false)
+	series, err := s.SpendingSeries(testPID, rangeStart, rangeEnd, "daily", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func TestSetCategoryExcludeHidesFromSpending(t *testing.T) {
 	}
 
 	// Top payees: Coffee gone, only Grocer left.
-	p, err := s.TopPayees(rangeStart, rangeEnd, 10)
+	p, err := s.TopPayees(testPID, rangeStart, rangeEnd, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,21 +189,21 @@ func TestSetCategoryExcludeHidesFromSpending(t *testing.T) {
 	}
 
 	// Toggling back restores it.
-	if err := s.SetCategoryExclude("Cards", false); err != nil {
+	if err := s.SetCategoryExclude(testPID, "Cards", false); err != nil {
 		t.Fatal(err)
 	}
-	if p, _ := s.TopPayees(rangeStart, rangeEnd, 10); len(p) != 2 {
+	if p, _ := s.TopPayees(testPID, rangeStart, rangeEnd, 10); len(p) != 2 {
 		t.Fatalf("after include, top payees = %+v, want 2", p)
 	}
 }
 
 func TestCategorySurvivesResync(t *testing.T) {
 	s := seedStore(t)
-	if err := s.SetTxnCategory("t1", "Groceries"); err != nil {
+	if err := s.SetTxnCategory(testPID, "t1", "Groceries"); err != nil {
 		t.Fatal(err)
 	}
 	// Re-sync the same transaction (e.g. it flips out of pending).
-	if err := s.SaveAccountSet(simplefin.AccountSet{Accounts: []simplefin.Account{{
+	if err := s.SaveAccountSet(testPID, simplefin.AccountSet{Accounts: []simplefin.Account{{
 		ID: "a1", Name: "Checking", Balance: "1000.00",
 		Transactions: []simplefin.Transaction{
 			{ID: "t1", Posted: at("2026-06-10T12:00:00Z"), Amount: "-10.00", Payee: "Coffee"},

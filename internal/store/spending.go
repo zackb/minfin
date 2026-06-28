@@ -76,13 +76,13 @@ func bucketTo(startDate, interval, ce string) string {
 // interval over [start,end). perAccount yields one line per account; otherwise a
 // single "Total" line.
 // ponytail: assumes one currency; group/convert if accounts mix.
-func (s *Store) SpendingSeries(start, end time.Time, interval string, perAccount bool) (Series, error) {
+func (s *Store) SpendingSeries(portfolioID string, start, end time.Time, interval string, perAccount bool) (Series, error) {
 	bucket := bucketExpr(interval)
 	// Join categories so excluded categories (e.g. Transfer, Credit Card Payment)
 	// drop out of the spending totals, matching the category pie charts.
-	from := `transactions t LEFT JOIN categories c ON c.name = t.category`
-	where := `t.posted >= ? AND t.posted < ? AND t.amount_cents < 0 AND COALESCE(c.exclude,0)=0`
-	args := []any{start.Unix(), end.Unix()}
+	from := `transactions t LEFT JOIN categories c ON c.portfolio_id = t.portfolio_id AND c.name = t.category`
+	where := `t.portfolio_id = ? AND t.posted >= ? AND t.posted < ? AND t.amount_cents < 0 AND COALESCE(c.exclude,0)=0`
+	args := []any{portfolioID, start.Unix(), end.Unix()}
 
 	cs, ce := start.Format(dateLayout), end.Format(dateLayout) // chart window [cs, ce)
 	lrows, err := s.db.Query(
@@ -124,8 +124,8 @@ func (s *Store) SpendingSeries(start, end time.Time, interval string, perAccount
 		        COALESCE(NULLIF(a.nickname,''), NULLIF(a.name,''), t.account_id) AS line,
 		        -SUM(t.amount_cents) AS spent
 		 FROM transactions t
-		      LEFT JOIN accounts a ON a.id = t.account_id
-		      LEFT JOIN categories c ON c.name = t.category
+		      LEFT JOIN accounts a ON a.portfolio_id = t.portfolio_id AND a.id = t.account_id
+		      LEFT JOIN categories c ON c.portfolio_id = t.portfolio_id AND c.name = t.category
 		 WHERE `+where+`
 		 GROUP BY `+groupCols+`
 		 ORDER BY b`, args...)
@@ -169,14 +169,14 @@ type PayeeStat struct {
 }
 
 // TopPayees ranks debit spend by payee over [start,end), highest spend first.
-func (s *Store) TopPayees(start, end time.Time, limit int) ([]PayeeStat, error) {
+func (s *Store) TopPayees(portfolioID string, start, end time.Time, limit int) ([]PayeeStat, error) {
 	rows, err := s.db.Query(
 		`SELECT t.payee, COUNT(*) AS n, -SUM(t.amount_cents) AS spent
-		 FROM transactions t LEFT JOIN categories c ON c.name = t.category
-		 WHERE t.posted >= ? AND t.posted < ? AND t.amount_cents < 0 AND COALESCE(c.exclude,0)=0
+		 FROM transactions t LEFT JOIN categories c ON c.portfolio_id = t.portfolio_id AND c.name = t.category
+		 WHERE t.portfolio_id = ? AND t.posted >= ? AND t.posted < ? AND t.amount_cents < 0 AND COALESCE(c.exclude,0)=0
 		 GROUP BY t.payee
 		 ORDER BY spent DESC, n DESC
-		 LIMIT ?`, start.Unix(), end.Unix(), limit)
+		 LIMIT ?`, portfolioID, start.Unix(), end.Unix(), limit)
 	if err != nil {
 		return nil, err
 	}

@@ -127,6 +127,37 @@ html.nav-collapsed .lbl {
     padding: .4rem .65rem;
 }
 
+/* User/logout footer pinned to the bottom of the sidebar. */
+.account {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    padding-top: .65rem;
+    border-top: 1px solid var(--line);
+}
+.account .email {
+    font-size: .75rem;
+    padding: 0 .65rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.account .logout {
+    display: flex;
+    align-items: center;
+    gap: .85rem;
+    padding: .5rem .65rem;
+    border-radius: 10px;
+    color: var(--muted);
+    text-decoration: none;
+    white-space: nowrap;
+}
+.account .logout:hover {
+    background: var(--surface2);
+    color: var(--text);
+}
+
 .content {
     flex: 1;
     min-width: 0;

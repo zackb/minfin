@@ -1,0 +1,30 @@
+{{define "signup"}}
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign up · minfin</title>
+    <link rel="icon" type="image/png" href="/static/img/favicon.png">
+    <link rel="stylesheet" href="/static/css/theme.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+</head>
+
+<body class="auth-body">
+    <div class="card auth-card">
+        <img class="logo" src="/static/img/logo-big.png" alt="minfin logo">
+        <h1 class="wordmark">minfin</h1>
+        <p class="tagline muted">Create your account.</p>
+        {{if .Error}}<div class="err">{{.Error}}</div>{{end}}
+        <form method="post" action="/signup" class="auth-form">
+            <input type="email" name="email" placeholder="Email" value="{{.Email}}" required autofocus>
+            <input type="password" name="password" placeholder="Password (8+ characters)" minlength="8" required>
+            <button type="submit" class="primary">Sign up</button>
+        </form>
+        <p class="muted">Already have an account? <a class="link" href="/login">Sign in</a></p>
+    </div>
+</body>
+
+</html>{{end}}

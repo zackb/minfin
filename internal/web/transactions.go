@@ -30,8 +30,9 @@ type transactionsView struct {
 
 func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	pid := portfolioID(r)
 	v := transactionsView{
-		viewBase:  s.base("transactions"),
+		viewBase:  s.base(r, "transactions"),
 		AccountID: q.Get("account"),
 		Category:  q.Get("category"),
 		Direction: orDefault(q.Get("dir"), "all"),
@@ -55,33 +56,34 @@ func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 	}
 	v.Page = page
 
-	accts, err := s.store.AccountList()
+	accts, err := s.store.AccountList(pid)
 	if err != nil {
 		v.Error = err.Error()
 	}
 	v.Accounts = accts
-	if cats, err := s.store.Categories(); err != nil {
+	if cats, err := s.store.Categories(pid); err != nil {
 		v.Error = err.Error()
 	} else {
 		v.Categories = cats
 	}
 
 	rows, hasNext, err := s.store.Transactions(store.TxnFilter{
-		Start:     start,
-		End:       end,
-		AccountID: v.AccountID,
-		Category:  v.Category,
-		Direction: v.Direction,
-		Query:     v.Query,
-		Limit:     txnPageSize,
-		Offset:    (page - 1) * txnPageSize,
+		PortfolioID: pid,
+		Start:       start,
+		End:         end,
+		AccountID:   v.AccountID,
+		Category:    v.Category,
+		Direction:   v.Direction,
+		Query:       v.Query,
+		Limit:       txnPageSize,
+		Offset:      (page - 1) * txnPageSize,
 	})
 	if err != nil {
 		v.Error = err.Error()
 	}
 	// Mark rows whose payee is already covered by a rule, so the "remember"
 	// checkbox reflects real state instead of resetting on every reload.
-	if rules, err := s.store.Rules(); err == nil {
+	if rules, err := s.store.Rules(pid); err == nil {
 		for i := range rows {
 			rows[i].Remembered = s.store.RuleMatches(rows[i].Payee, rules)
 		}

@@ -46,6 +46,12 @@
         </form>
         {{if .LastSync}}<div class="synced lbl muted">Synced {{.LastSync}}</div>{{end}}
         {{end}}
+        {{if .Email}}
+        <div class="account">
+            <span class="email lbl muted" title="{{.Email}}">{{.Email}}</span>
+            <a href="/logout" class="logout" title="Log out"><span class="ico">⎋</span><span class="lbl">Log out</span></a>
+        </div>
+        {{end}}
     </aside>
 
     <div class="content">

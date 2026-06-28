@@ -38,10 +38,10 @@ func TestValidType(t *testing.T) {
 
 func TestSetAccountTypeRoundTrip(t *testing.T) {
 	s := seedStore(t)
-	if err := s.SetAccountType("a1", "checking"); err != nil {
+	if err := s.SetAccountType(testPID, "a1", "checking"); err != nil {
 		t.Fatal(err)
 	}
-	accts, err := s.Accounts(rangeEnd)
+	accts, err := s.Accounts(testPID, rangeEnd)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,16 +55,16 @@ func TestSetAccountTypeRoundTrip(t *testing.T) {
 // The bug guard: a re-sync must not wipe a user-set type, and must update balance.
 func TestSaveAccountSetPreservesType(t *testing.T) {
 	s := seedStore(t)
-	if err := s.SetAccountType("a1", "checking"); err != nil {
+	if err := s.SetAccountType(testPID, "a1", "checking"); err != nil {
 		t.Fatal(err)
 	}
 	resync := simplefin.AccountSet{Accounts: []simplefin.Account{
 		{ID: "a1", Name: "Checking", Balance: "1234.00"},
 	}}
-	if err := s.SaveAccountSet(resync); err != nil {
+	if err := s.SaveAccountSet(testPID, resync); err != nil {
 		t.Fatal(err)
 	}
-	accts, err := s.Accounts(rangeEnd)
+	accts, err := s.Accounts(testPID, rangeEnd)
 	if err != nil {
 		t.Fatal(err)
 	}

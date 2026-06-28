@@ -48,11 +48,12 @@ func toPie(stats []store.CategoryStat) pieData {
 var palette = []string{"#26c6da", "#7e57c2", "#66bb6a", "#ffa726", "#ef5350", "#42a5f5", "#ec407a", "#26a69a"}
 
 func (s *Server) handleCategories(w http.ResponseWriter, r *http.Request) {
-	v := categoriesView{viewBase: s.base("categories")}
+	v := categoriesView{viewBase: s.base(r, "categories")}
 	if !v.Connected {
 		s.render(w, "categories", v)
 		return
 	}
+	pid := portfolioID(r)
 	q := r.URL.Query()
 	now := time.Now()
 	v.To = orDefault(q.Get("to"), now.Format(dateLayout))
@@ -60,24 +61,24 @@ func (s *Server) handleCategories(w http.ResponseWriter, r *http.Request) {
 	start := parseDate(v.From, now.AddDate(0, 0, -30))
 	end := parseDate(v.To, now).AddDate(0, 0, 1)
 
-	if spend, err := s.store.SpendByCategory(start, end); err != nil {
+	if spend, err := s.store.SpendByCategory(pid, start, end); err != nil {
 		v.Error = err.Error()
 	} else {
 		v.Spend = spend
 		v.SpendJSON = marshalPie(spend)
 	}
-	if income, err := s.store.IncomeByCategory(start, end); err != nil {
+	if income, err := s.store.IncomeByCategory(pid, start, end); err != nil {
 		v.Error = err.Error()
 	} else {
 		v.Income = income
 		v.IncomeJSON = marshalPie(income)
 	}
-	if cats, err := s.store.Categories(); err != nil {
+	if cats, err := s.store.Categories(pid); err != nil {
 		v.Error = err.Error()
 	} else {
 		v.Categories = cats
 	}
-	if rules, err := s.store.Rules(); err != nil {
+	if rules, err := s.store.Rules(pid); err != nil {
 		v.Error = err.Error()
 	} else {
 		v.Rules = rules
@@ -99,14 +100,15 @@ func (s *Server) handleTxnCategory(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "transaction id required", http.StatusBadRequest)
 		return
 	}
-	if err := s.store.SetTxnCategory(id, category); err != nil {
+	pid := portfolioID(r)
+	if err := s.store.SetTxnCategory(pid, id, category); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if r.FormValue("remember") != "" && category != "" {
 		pattern := strings.TrimSpace(orDefault(r.FormValue("pattern"), r.FormValue("payee")))
 		if pattern != "" {
-			if err := s.store.AddRule(pattern, category); err != nil {
+			if err := s.store.AddRule(pid, pattern, category); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -118,7 +120,7 @@ func (s *Server) handleTxnCategory(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCategoryAdd(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.FormValue("name"))
 	if name != "" {
-		if err := s.store.AddCategory(name); err != nil {
+		if err := s.store.AddCategory(portfolioID(r), name); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -128,7 +130,7 @@ func (s *Server) handleCategoryAdd(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCategoryDelete(w http.ResponseWriter, r *http.Request) {
 	if name := r.FormValue("name"); name != "" {
-		if err := s.store.DeleteCategory(name); err != nil {
+		if err := s.store.DeleteCategory(portfolioID(r), name); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -138,7 +140,7 @@ func (s *Server) handleCategoryDelete(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCategoryExclude(w http.ResponseWriter, r *http.Request) {
 	if name := r.FormValue("name"); name != "" {
-		if err := s.store.SetCategoryExclude(name, r.FormValue("exclude") == "1"); err != nil {
+		if err := s.store.SetCategoryExclude(portfolioID(r), name, r.FormValue("exclude") == "1"); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -150,7 +152,7 @@ func (s *Server) handleRuleAdd(w http.ResponseWriter, r *http.Request) {
 	pattern := strings.TrimSpace(r.FormValue("pattern"))
 	category := r.FormValue("category")
 	if pattern != "" && category != "" {
-		if err := s.store.AddRule(pattern, category); err != nil {
+		if err := s.store.AddRule(portfolioID(r), pattern, category); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -160,7 +162,7 @@ func (s *Server) handleRuleAdd(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleRuleDelete(w http.ResponseWriter, r *http.Request) {
 	if id, err := strconv.ParseInt(r.FormValue("id"), 10, 64); err == nil {
-		if err := s.store.DeleteRule(id); err != nil {
+		if err := s.store.DeleteRule(portfolioID(r), id); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -171,7 +173,7 @@ func (s *Server) handleRuleDelete(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleRecategorize(w http.ResponseWriter, r *http.Request) {
 	// Manual button overwrites: re-apply rules over already-categorized rows so
 	// stale/mis-matched categories get corrected.
-	if _, err := s.store.ApplyRules(true); err != nil {
+	if _, err := s.store.ApplyRules(portfolioID(r), true); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
