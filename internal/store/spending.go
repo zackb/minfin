@@ -37,7 +37,7 @@ func bucketExpr(interval string) string {
 // bucketStartExpr is the canonical first calendar day of a bucket, so we never
 // reverse-parse the display label (the weekly %W form has no clean inverse).
 // Weekly uses Monday-start to match daterange.Resolve's (weekday+6)%7.
-// ponytail: at the year boundary a %W week split across two year-labels maps
+// At the year boundary a %W week split across two year-labels maps
 // both halves to the same Monday start. Rare; bucketing weekly by the Monday
 // date itself would fix it but changes the visible axis label. Out of scope.
 func bucketStartExpr(interval string) string {

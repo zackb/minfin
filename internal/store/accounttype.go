@@ -48,7 +48,6 @@ func ValidType(key string) bool {
 // Classify reports whether an account is a liability. The type wins; an
 // uncategorized account falls back to its balance sign so the Assets/Liabilities
 // split is right before anything is tagged.
-// ponytail: sign fallback until user tags.
 func Classify(typ string, balanceCents int64) bool {
 	for _, t := range AccountTypes {
 		if t.Key == typ {

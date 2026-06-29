@@ -58,6 +58,31 @@ func (s *Store) Accounts(portfolioID string, now time.Time) ([]AccountInfo, erro
 	return out, rows.Err()
 }
 
+// Summary is the asset/liability/net-worth rollup over a set of accounts.
+type Summary struct {
+	Assets      float64
+	Liabilities float64
+	NetWorth    float64
+}
+
+// Summarize splits accounts into asset/liability totals. Liability balances
+// already arrive negative, so net worth is just their sum. An account's
+// underlying asset value (house, car) counts toward assets and net worth on top
+// of its loan balance. Shared by the web server and the local thick clients.
+func Summarize(accts []AccountInfo) Summary {
+	var s Summary
+	for _, a := range accts {
+		s.NetWorth += a.Balance + a.AssetValue
+		if a.Liability {
+			s.Liabilities += a.Balance
+		} else {
+			s.Assets += a.Balance
+		}
+		s.Assets += a.AssetValue // 0 for non-asset accounts
+	}
+	return s
+}
+
 // Display is the nickname if set, else the institution-given name.
 func (a AccountInfo) Display() string {
 	if a.Nickname != "" {
