@@ -69,6 +69,7 @@ func NewServer(s *store.Store, a *auth.Service) *Server {
 	srv.mux.HandleFunc("/categories/recategorize", srv.handleRecategorize)
 	srv.mux.HandleFunc("/setup", srv.handleSetup)
 	srv.mux.HandleFunc("/sync", srv.handleSync)
+	srv.registerAPI()
 	return srv
 }
 
@@ -91,9 +92,11 @@ func portfolioID(r *http.Request) string {
 	return v
 }
 
-// publicPaths bypass auth: static assets and the auth screens themselves.
+// publicPaths bypass auth: static assets, the auth screens, and the API's own
+// login/signup endpoints (which mint the token everything else requires).
 func publicPath(p string) bool {
-	return p == "/login" || p == "/signup" || p == "/logout" || strings.HasPrefix(p, "/static/")
+	return p == "/login" || p == "/signup" || p == "/logout" ||
+		p == "/api/login" || p == "/api/signup" || strings.HasPrefix(p, "/static/")
 }
 
 // withAuth requires a valid token on every non-public route, then resolves the
@@ -107,6 +110,11 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 		}
 		uid, ok := s.auth.IsAuthenticated(r)
 		if !ok {
+			// API clients get a 401 JSON body; browsers get redirected to login.
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				apiError(w, http.StatusUnauthorized, "unauthorized")
+				return
+			}
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
