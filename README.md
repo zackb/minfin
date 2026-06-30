@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="minfin" width="200">
+  <img src="assets/icon.png" alt="minfin" width="200">
 </p>
 
 # minfin
