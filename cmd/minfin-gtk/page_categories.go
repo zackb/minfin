@@ -131,7 +131,24 @@ func (a *App) categoriesGroup(cats []store.Category) gtk.Widgetter {
 	grp := adw.NewPreferencesGroup()
 	grp.SetTitle("Categories")
 	grp.SetDescription("The switch excludes a category from spend/income totals (e.g. Transfer).")
-	grp.SetHeaderSuffix(a.addCategoryButton())
+
+	// Inline freeform create
+	add := adw.NewEntryRow()
+	add.SetTitle("New category")
+	add.SetShowApplyButton(true)
+	add.ConnectApply(func() {
+		name := add.Text()
+		if name == "" {
+			return
+		}
+		if err := a.st.AddCategory(a.pid, name); err != nil {
+			a.toast("Couldn't add: " + err.Error())
+			return
+		}
+		add.SetText("")
+		a.refreshAll()
+	})
+	grp.Add(add)
 
 	for _, c := range cats {
 		row := actionRow()
@@ -177,45 +194,36 @@ func (a *App) categoriesGroup(cats []store.Category) gtk.Widgetter {
 	return grp
 }
 
-func (a *App) addCategoryButton() *gtk.MenuButton {
-	mb := gtk.NewMenuButton()
-	mb.SetIconName("list-add-symbolic")
-	mb.AddCSSClass("flat")
-	mb.SetTooltipText("Add category")
-
-	pop := gtk.NewPopover()
-	box := popoverBox()
-	entry := gtk.NewEntry()
-	entry.SetPlaceholderText("New category")
-	add := gtk.NewButtonWithLabel("Add")
-	add.AddCSSClass("suggested-action")
-	commit := func() {
-		name := entry.Text()
-		if name == "" {
-			return
-		}
-		if err := a.st.AddCategory(a.pid, name); err != nil {
-			a.toast("Couldn't add: " + err.Error())
-			return
-		}
-		entry.SetText("")
-		pop.Popdown()
-		a.refreshAll()
-	}
-	entry.ConnectActivate(commit)
-	add.ConnectClicked(commit)
-	box.Append(entry)
-	box.Append(add)
-	pop.SetChild(box)
-	mb.SetPopover(pop)
-	return mb
-}
-
 func (a *App) rulesGroup(cats []store.Category, rules []store.Rule) gtk.Widgetter {
 	grp := adw.NewPreferencesGroup()
 	grp.SetTitle("Rules")
 	grp.SetDescription("Payees matching a pattern are auto-categorized on sync.")
-	grp.SetHeaderSuffix(a.addRuleButton(cats))
+
+	// Inline freeform create
+	// pattern entry + category dropdown + apply.
+	add := adw.NewEntryRow()
+	add.SetTitle("Payee contains…")
+	labels := make([]string, len(cats))
+	for i, c := range cats {
+		labels[i] = c.Name
+	}
+	dd := gtk.NewDropDownFromStrings(labels)
+	dd.SetVAlign(gtk.AlignCenter)
+	add.AddSuffix(dd)
+	add.SetShowApplyButton(true)
+	add.ConnectApply(func() {
+		i := int(dd.Selected())
+		if add.Text() == "" || i < 0 || i >= len(cats) {
+			return
+		}
+		if err := a.st.AddRule(a.pid, add.Text(), cats[i].Name); err != nil {
+			a.toast("Couldn't add rule: " + err.Error())
+			return
+		}
+		add.SetText("")
+		a.refreshAll()
+	})
+	grp.Add(add)
 
 	if len(rules) == 0 {
 		row := actionRow()
@@ -242,50 +250,6 @@ func (a *App) rulesGroup(cats []store.Category, rules []store.Rule) gtk.Widgette
 		grp.Add(row)
 	}
 	return grp
-}
-
-func (a *App) addRuleButton(cats []store.Category) *gtk.MenuButton {
-	mb := gtk.NewMenuButton()
-	mb.SetIconName("list-add-symbolic")
-	mb.AddCSSClass("flat")
-	mb.SetTooltipText("Add rule")
-
-	pop := gtk.NewPopover()
-	box := popoverBox()
-
-	pattern := gtk.NewEntry()
-	pattern.SetPlaceholderText("Payee contains…")
-
-	labels := make([]string, len(cats))
-	for i, c := range cats {
-		labels[i] = c.Name
-	}
-	dd := gtk.NewDropDownFromStrings(labels)
-
-	add := gtk.NewButtonWithLabel("Add rule")
-	add.AddCSSClass("suggested-action")
-	add.ConnectClicked(func() {
-		i := int(dd.Selected())
-		if pattern.Text() == "" || i < 0 || i >= len(cats) {
-			return
-		}
-		if err := a.st.AddRule(a.pid, pattern.Text(), cats[i].Name); err != nil {
-			a.toast("Couldn't add rule: " + err.Error())
-			return
-		}
-		pattern.SetText("")
-		pop.Popdown()
-		a.refreshAll()
-	})
-
-	box.Append(sectionLabel("Payee pattern"))
-	box.Append(pattern)
-	box.Append(sectionLabel("Category"))
-	box.Append(dd)
-	box.Append(add)
-	pop.SetChild(box)
-	mb.SetPopover(pop)
-	return mb
 }
 
 func (a *App) recategorizeButton() *gtk.Button {

@@ -106,17 +106,6 @@ func expanderRow() *adw.ExpanderRow {
 	return r
 }
 
-// popoverBox is the padded, sensibly-wide content box for a small popover form.
-func popoverBox() *gtk.Box {
-	b := vbox(8)
-	b.SetMarginTop(10)
-	b.SetMarginBottom(10)
-	b.SetMarginStart(10)
-	b.SetMarginEnd(10)
-	b.SetSizeRequest(240, -1)
-	return b
-}
-
 // dropDown builds a string dropdown with its initial selection applied BEFORE
 // the change handler is connected, so restoring state on a page rebuild doesn't
 // re-fire onChange (which would loop the refresh).
