@@ -44,7 +44,7 @@ Then open http://localhost:8080.
 
 Config (all optional):
 - `PORT` — HTTP port (default `8080`)
-- `MINFIN_DB` — SQLite path (default `minfin.db`)
+- `MINFIN_DB` — SQLite path (default `$XDG_DATA_HOME/minfin/minfin.db`) (~/.local/share/minfin/minfin.db)
 
 ## SimpleFIN token
 
