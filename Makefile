@@ -8,11 +8,9 @@ all: build tui gtk
 build:
 	go build -o bin/minfin ./cmd/minfin
 
-# Local thick clients — read the SQLite file directly, no server.
 tui:
 	go build -o bin/minfin-tui ./cmd/minfin-tui
 
-# Needs GTK4 dev libraries (pkg-config gtk4); cgo via gotk4.
 gtk:
 	go build -o bin/minfin-gtk ./cmd/minfin-gtk
 

@@ -14,7 +14,9 @@ Very early. Expect rough edges.
 
 ## Build & run
 
-Requires Go 1.26+.
+#### Dependencies
+- Go 1.26+.
+- libadwaita-dev
 
 ```sh
 make run        # or: make build && ./bin/minfin
