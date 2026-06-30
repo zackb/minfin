@@ -1,6 +1,6 @@
 .PHONY: build tui gtk demo-tui demo-gtk test run fmt clean icons install-gtk uninstall-gtk
 
-# Throwaway DB for the demo targets — never the live minfin.db.
+# Throwaway DB for the demo targets
 DEMO_DB ?= /tmp/minfin-demo.db
 
 # User-level install prefix (no sudo). Override PREFIX=/usr/local for a system install.
@@ -56,7 +56,6 @@ install-gtk: gtk
 	sed 's|@BINDIR@|$(BINDIR)|g' packaging/$(APPID).desktop > $(DATADIR)/applications/$(APPID).desktop
 	-update-desktop-database $(DATADIR)/applications
 	-gtk-update-icon-cache -qtf $(DATADIR)/icons/hicolor
-	@echo "Installed. First run? Migrate data: mv minfin.db $${XDG_DATA_HOME:-$$HOME/.local/share}/minfin/minfin.db"
 
 uninstall-gtk:
 	rm -f $(BINDIR)/minfin-gtk $(DATADIR)/applications/$(APPID).desktop
