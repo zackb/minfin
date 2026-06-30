@@ -21,6 +21,10 @@ gtk:
 	go build -o bin/minfin-gtk ./cmd/minfin-gtk
 
 # Seed a fresh throwaway DB and launch the client against it.
+demo: build
+	rm -f "$(DEMO_DB)" && go run ./cmd/minfin-seed "$(DEMO_DB)"
+	MINFIN_JWT_SECRET=demo MINFIN_DB=$(DEMO_DB) ./bin/minfin
+
 demo-tui: tui
 	rm -f "$(DEMO_DB)" && go run ./cmd/minfin-seed "$(DEMO_DB)"
 	MINFIN_DB="$(DEMO_DB)" ./bin/minfin-tui
@@ -34,9 +38,6 @@ test:
 
 run:
 	go run ./cmd/minfin
-
-demo: build
-	MINFIN_DB=demo.db ./bin/minfin
 
 fmt:
 	go fmt ./...

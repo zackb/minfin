@@ -10,6 +10,13 @@ It syncs your accounts and transactions into a local SQLite file and shows you b
 
 I've used every alternative out there and this is the only one that gets it right.
 
+<p align="center">
+  <img src="assets/demo/dashboard.png" alt="minfin" width="200">
+</p>
+
+<p align="center">
+  <img src="assets/demo/categories.png" alt="minfin" width="200">
+</p>
 
 ## Build & run
 
