@@ -81,6 +81,16 @@ func moneySuffix(v float64) *gtk.Label {
 	return l
 }
 
+// amountLabel is an untinted, right-aligned money label for table columns (the
+// web category tables show amounts in a neutral column, not sign-tinted).
+func amountLabel(v float64) *gtk.Label {
+	l := gtk.NewLabel(dashboard.USD(v))
+	l.AddCSSClass("numeric")
+	l.SetVAlign(gtk.AlignCenter)
+	l.SetXAlign(1)
+	return l
+}
+
 // actionRow / expanderRow build list rows with Pango markup disabled, so user
 // data containing &, <, > (e.g. "Gas & Fuel") renders literally instead of
 // failing markup parsing. use-markup covers both the title and the subtitle.

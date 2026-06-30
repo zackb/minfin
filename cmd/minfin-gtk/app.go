@@ -29,6 +29,13 @@ type App struct {
 
 	txn   txnState   // transactions page filters, persisted across refreshes
 	spend spendState // spending page controls, persisted across refreshes
+	cat   catState   // categories page date range, persisted across refreshes
+}
+
+// catState is the categories page's date range, kept on App so it survives the
+// page rebuilding itself on refresh.
+type catState struct {
+	rangeKey string // daterange preset; "" => last 30 days
 }
 
 // spendState is the spending page's range/interval/split controls.

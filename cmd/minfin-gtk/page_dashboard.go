@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/cairo"
@@ -35,21 +36,56 @@ func (a *App) buildDashboard() gtk.Widgetter {
 	cards.Append(statCard("Liabilities", sum.Liabilities))
 	body.Append(cards)
 
-	// 30-day spending visuals.
+	// Spending line chart, last 30 days.
 	start := a.now().AddDate(0, 0, -30)
 	end := a.now().AddDate(0, 0, 1)
 	if series, err := a.st.SpendingSeries(a.pid, start, end, "daily", false); err == nil {
-		body.Append(chartCard("Spending — last 30 days", 200, func(cr *cairo.Context, w, h int, ink chartInk) {
-			drawLineChart(cr, w, h, series, ink)
-		}))
-	}
-	if stats, err := a.st.SpendByCategory(a.pid, start, end); err == nil && len(stats) > 0 {
-		body.Append(a.pieCard("By category — last 30 days", 200, stats))
+		body.Append(a.spendingCard(series))
 	}
 
-	// Accounts overview.
+	// Accounts and Top Vendors, side by side (the web dashboard's two-column grid).
+	columns := hbox(12)
+	columns.SetHomogeneous(true)
+	columns.Append(a.accountsColumn(accts))
+	columns.Append(a.vendorsColumn(start, end))
+	body.Append(columns)
+
+	return pageBody(body)
+}
+
+// spendingCard is the 30-day spending line chart with a "view all →" link to the
+// full Spending page in its header (matches the web dashboard).
+func (a *App) spendingCard(series store.Series) gtk.Widgetter {
+	box := vbox(8)
+	box.AddCSSClass("card")
+	box.AddCSSClass("stat")
+
+	header := hbox(8)
+	lbl := sectionLabel("Spending — last 30 days")
+	lbl.SetHExpand(true)
+	header.Append(lbl)
+	link := gtk.NewButtonWithLabel("view all →")
+	link.AddCSSClass("flat")
+	link.AddCSSClass("dim-label")
+	link.SetVAlign(gtk.AlignCenter)
+	link.ConnectClicked(func() { a.stack.SetVisibleChildName("spending") })
+	header.Append(link)
+	box.Append(header)
+
+	box.Append(chartArea(200, func(cr *cairo.Context, w, h int, ink chartInk) {
+		drawLineChart(cr, w, h, series, ink)
+	}))
+	return box
+}
+
+func (a *App) accountsColumn(accts []store.AccountInfo) gtk.Widgetter {
 	ag := adw.NewPreferencesGroup()
 	ag.SetTitle("Accounts")
+	if len(accts) == 0 {
+		row := actionRow()
+		row.SetTitle("No accounts synced yet")
+		ag.Add(row)
+	}
 	for _, ac := range accts {
 		row := actionRow()
 		row.SetTitle(ac.Display())
@@ -61,50 +97,29 @@ func (a *App) buildDashboard() gtk.Widgetter {
 		row.AddSuffix(moneySuffix(ac.Balance))
 		ag.Add(row)
 	}
-	body.Append(ag)
+	return ag
+}
 
-	// Top payees, last 30 days.
-	if payees, err := a.st.TopPayees(a.pid, start, end, 8); err == nil && len(payees) > 0 {
-		pg := adw.NewPreferencesGroup()
-		pg.SetTitle("Top payees")
-		pg.SetDescription("Last 30 days")
-		for _, p := range payees {
-			row := actionRow()
-			row.SetTitle(p.Payee)
-			row.SetSubtitle(fmt.Sprintf("%d transactions", p.Count))
-			row.AddSuffix(moneySuffix(-p.Spent))
-			pg.Add(row)
-		}
-		body.Append(pg)
+func (a *App) vendorsColumn(start, end time.Time) gtk.Widgetter {
+	pg := adw.NewPreferencesGroup()
+	pg.SetTitle("Top Vendors · 30 Days")
+	payees, err := a.st.TopPayees(a.pid, start, end, 8)
+	if err != nil || len(payees) == 0 {
+		row := actionRow()
+		row.SetTitle("No spending in the last 30 days")
+		pg.Add(row)
+		return pg
 	}
-
-	return pageBody(body)
+	for _, p := range payees {
+		row := actionRow()
+		row.SetTitle(p.Payee)
+		row.SetSubtitle(fmt.Sprintf("%d transactions", p.Count))
+		row.AddSuffix(moneySuffix(-p.Spent))
+		pg.Add(row)
+	}
+	return pg
 }
 
-// pieCard is a chart card whose slices/legend rows navigate to the Transactions
-// page filtered to the clicked category (like the web app).
-func (a *App) pieCard(title string, height int, stats []store.CategoryStat) gtk.Widgetter {
-	da := chartArea(height, func(cr *cairo.Context, w, h int, ink chartInk) {
-		drawPieChart(cr, w, h, stats, ink)
-	})
-	click := gtk.NewGestureClick()
-	click.ConnectReleased(func(_ int, x, y float64) {
-		if cat := pieSliceAt(x, y, da.Width(), da.Height(), stats); cat != "" {
-			a.showCategoryTxns(cat)
-		}
-	})
-	da.AddController(click)
-
-	box := vbox(8)
-	box.AddCSSClass("card")
-	box.AddCSSClass("stat")
-	box.Append(sectionLabel(title))
-	box.Append(da)
-	return box
-}
-
-// errorState renders a query failure inline so a broken page doesn't blank the
-// whole window.
 // typeLabel maps an account type key to its human label, "" if uncategorized.
 func typeLabel(key string) string {
 	for _, t := range store.AccountTypes {
@@ -115,6 +130,8 @@ func typeLabel(key string) string {
 	return ""
 }
 
+// errorState renders a query failure inline so a broken page doesn't blank the
+// whole window.
 func errorState(err error) gtk.Widgetter {
 	sp := adw.NewStatusPage()
 	sp.SetIconName("dialog-error-symbolic")

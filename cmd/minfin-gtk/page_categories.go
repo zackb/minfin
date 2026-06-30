@@ -4,8 +4,10 @@ import (
 	"fmt"
 
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
+	"github.com/diamondburned/gotk4/pkg/cairo"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 
+	"github.com/zackb/minfin/internal/daterange"
 	"github.com/zackb/minfin/internal/store"
 )
 
@@ -19,11 +21,24 @@ func (a *App) buildCategories() gtk.Widgetter {
 	}
 	rules, _ := a.st.Rules(a.pid)
 
+	rangeKey := a.cat.rangeKey
+	if rangeKey == "" {
+		rangeKey = "last-30-days"
+	}
+	start, end := daterange.Resolve(rangeKey, a.now())
+
 	body := vbox(18)
 	title := gtk.NewLabel("Categories")
 	title.AddCSSClass("title-1")
 	title.SetXAlign(0)
 	body.Append(title)
+
+	body.Append(a.catRangeBar(rangeKey))
+
+	spend, _ := a.st.SpendByCategory(a.pid, start, end)
+	body.Append(a.categoryStatSection("Spending by Category", spend, "No spending in this range"))
+	income, _ := a.st.IncomeByCategory(a.pid, start, end)
+	body.Append(a.categoryStatSection("Income by Category", income, "No income in this range"))
 
 	body.Append(a.categoriesGroup(cats))
 	body.Append(a.rulesGroup(cats, rules))
@@ -34,6 +49,82 @@ func (a *App) buildCategories() gtk.Widgetter {
 	body.Append(recat)
 
 	return pageBody(body)
+}
+
+// catRangeBar is the date-range dropdown feeding the spending/income sections.
+func (a *App) catRangeBar(rangeKey string) gtk.Widgetter {
+	bar := hbox(8)
+	bar.SetHAlign(gtk.AlignStart)
+	labels := make([]string, len(daterange.Options))
+	sel := 0
+	for i, o := range daterange.Options {
+		labels[i] = o.Label
+		if o.Key == rangeKey {
+			sel = i
+		}
+	}
+	bar.Append(dropDown(labels, sel, func(i int) {
+		a.cat.rangeKey = daterange.Options[i].Key
+		a.refreshPage("categories")
+	}))
+	return bar
+}
+
+// categoryStatSection is a category pie plus a table of the same data
+// (swatch · category · txns · amount), mirroring the web Categories page.
+// Clicking a slice, legend entry, or table row filters Transactions by category.
+func (a *App) categoryStatSection(title string, stats []store.CategoryStat, emptyMsg string) gtk.Widgetter {
+	box := vbox(8)
+	box.Append(a.pieCard(title, 260, stats))
+
+	grp := adw.NewPreferencesGroup()
+	if len(stats) == 0 {
+		row := actionRow()
+		row.SetTitle(emptyMsg)
+		grp.Add(row)
+		box.Append(grp)
+		return box
+	}
+	for i, s := range stats {
+		// Swatch color must match the pie slice: hex if set, else the palette by
+		// index (same fallback drawPieChart's sliceColor uses).
+		hex := s.Color
+		if hex == "" {
+			hex = chartPalette[i%len(chartPalette)]
+		}
+		row := actionRow()
+		row.AddPrefix(colorSwatch(hex))
+		row.SetTitle(s.Category)
+		row.SetSubtitle(fmt.Sprintf("%d transactions", s.Count))
+		row.SetActivatable(true)
+		row.ConnectActivated(func() { a.showCategoryTxns(s.Category) })
+		row.AddSuffix(amountLabel(s.Amount))
+		grp.Add(row)
+	}
+	box.Append(grp)
+	return box
+}
+
+// pieCard is a chart card whose slices/legend rows navigate to the Transactions
+// page filtered to the clicked category (like the web app).
+func (a *App) pieCard(title string, height int, stats []store.CategoryStat) gtk.Widgetter {
+	da := chartArea(height, func(cr *cairo.Context, w, h int, ink chartInk) {
+		drawPieChart(cr, w, h, stats, ink)
+	})
+	click := gtk.NewGestureClick()
+	click.ConnectReleased(func(_ int, x, y float64) {
+		if cat := pieSliceAt(x, y, da.Width(), da.Height(), stats); cat != "" {
+			a.showCategoryTxns(cat)
+		}
+	})
+	da.AddController(click)
+
+	box := vbox(8)
+	box.AddCSSClass("card")
+	box.AddCSSClass("stat")
+	box.Append(sectionLabel(title))
+	box.Append(da)
+	return box
 }
 
 func (a *App) categoriesGroup(cats []store.Category) gtk.Widgetter {
