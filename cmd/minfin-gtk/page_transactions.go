@@ -5,6 +5,7 @@ import (
 
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
+	"github.com/diamondburned/gotk4/pkg/pango"
 
 	"github.com/zackb/minfin/internal/daterange"
 	"github.com/zackb/minfin/internal/store"
@@ -132,7 +133,7 @@ func (a *App) txnFilterBar(rangeKey string, cats []store.Category, accts []store
 
 	// Search (applied on Enter).
 	search := gtk.NewEntry()
-	search.SetPlaceholderText("Search payee or description — press Enter")
+	search.SetPlaceholderText("Search payee or description...")
 	search.SetText(a.txn.query)
 	search.SetHExpand(true)
 	search.ConnectActivate(func() {
@@ -153,21 +154,38 @@ func (a *App) txnRow(r store.TxnRow, cats []store.Category, rules []store.Rule) 
 	}
 	row.SetTitle(payee)
 	sub := r.Posted.Format("Jan 2, 2006") + " · " + r.Account
-	if r.Category != "" {
-		sub += " · " + r.Category
-	}
 	if r.Pending {
 		sub += " · pending"
 	}
 	row.SetSubtitle(sub)
-	row.AddSuffix(moneySuffix(r.Amount))
+
+	cat := hbox(6)
+	cat.SetVAlign(gtk.AlignCenter)
+	cat.SetMarginEnd(8)
+
+	lbl := gtk.NewLabel(r.Category)
+	if r.Category == "" {
+		lbl.SetText("Uncategorized")
+		lbl.AddCSSClass("dim-label")
+	}
+	lbl.SetXAlign(0)
+	lbl.SetSizeRequest(120, -1)
+	lbl.SetEllipsize(pango.EllipsizeEnd)
+	cat.Append(lbl)
 
 	edit := gtk.NewMenuButton()
 	edit.SetIconName("document-edit-symbolic")
 	edit.SetVAlign(gtk.AlignCenter)
 	edit.AddCSSClass("flat")
 	edit.SetPopover(a.categorizePopover(r, cats, rules))
-	row.AddSuffix(edit)
+	cat.Append(edit)
+	row.AddSuffix(cat)
+
+	// Amount: fixed-width, right-aligned, so this column also lines up.
+	amt := moneySuffix(r.Amount)
+	amt.SetSizeRequest(100, -1)
+	amt.SetXAlign(1)
+	row.AddSuffix(amt)
 	return row
 }
 

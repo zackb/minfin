@@ -68,10 +68,6 @@ func (a *App) connectToken(token string) {
 			a.pid = pid
 			a.toast("Connected")
 			a.reload()
-			// ponytail: the header portfolio switcher is built once at launch, so
-			// a newly added 2nd+ portfolio shows in it on next start. Single
-			// portfolio (the common case) is fine. Rebuild the header here if
-			// juggling many portfolios in one session ever matters.
 		})
 	}()
 }
