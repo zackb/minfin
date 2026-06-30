@@ -47,6 +47,34 @@ func TestApplyRulesFillOnly(t *testing.T) {
 	}
 }
 
+func TestIncomeExcludesLiabilityAccounts(t *testing.T) {
+	s := seedStore(t) // a1 Checking: Paycheck +100; a2 Savings: Interest +50
+	// An auto loan whose payment posts as a positive amount (debt paydown).
+	if err := s.SaveAccountSet(testPID, simplefin.AccountSet{Accounts: []simplefin.Account{{
+		ID: "loan1", Name: "Auto Loan", Balance: "-20000.00",
+		Transactions: []simplefin.Transaction{
+			{ID: "p1", Posted: at("2026-06-10T12:00:00Z"), Amount: "400.00", Payee: "Car Payment"},
+		},
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetAccountType(testPID, "loan1", "auto_loan"); err != nil {
+		t.Fatal(err)
+	}
+
+	income, err := s.IncomeByCategory(testPID, rangeStart, rangeEnd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var total float64
+	for _, st := range income {
+		total += st.Amount
+	}
+	if total != 100 { // Paycheck 100 in range; Interest 50 is at 06-09 (out of range); Car Payment 400 excluded
+		t.Fatalf("income total = %v, want 100 (loan payment must be excluded)", total)
+	}
+}
+
 func TestApplyRulesLongestMatchWins(t *testing.T) {
 	s := seedStore(t)
 	s.AddCategory(testPID, "PayPal")

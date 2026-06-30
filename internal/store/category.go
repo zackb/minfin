@@ -255,7 +255,7 @@ func (s *Store) SpendByCategory(portfolioID string, start, end time.Time) ([]Cat
 
 // IncomeByCategory aggregates credit income (amount>0) by category over [start,end).
 func (s *Store) IncomeByCategory(portfolioID string, start, end time.Time) ([]CategoryStat, error) {
-	return s.byCategory(portfolioID, start, end, "t.amount_cents > 0", "SUM(t.amount_cents)")
+	return s.byCategory(portfolioID, start, end, "t.amount_cents > 0 AND "+liabilityExcludeSQL(), "SUM(t.amount_cents)")
 }
 
 func (s *Store) byCategory(portfolioID string, start, end time.Time, sign, sum string) ([]CategoryStat, error) {
@@ -264,6 +264,7 @@ func (s *Store) byCategory(portfolioID string, start, end time.Time, sign, sum s
 		        COALESCE(c.color, '') AS color,
 		        COUNT(*) AS n, `+sum+` AS amt
 		 FROM transactions t
+		      LEFT JOIN accounts a ON a.portfolio_id = t.portfolio_id AND a.id = t.account_id
 		      LEFT JOIN categories c ON c.portfolio_id = t.portfolio_id AND c.name = t.category
 		 WHERE t.portfolio_id = ? AND t.posted >= ? AND t.posted < ? AND `+sign+`
 		       AND COALESCE(c.exclude, 0) = 0

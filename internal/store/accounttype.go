@@ -1,5 +1,7 @@
 package store
 
+import "strings"
+
 // AccountType is a user-assignable account category. Liability marks the ones
 // that count against net worth (their balances already arrive negative). Asset
 // marks loan types with an underlying asset (house, car) whose value the user
@@ -20,6 +22,20 @@ var AccountTypes = []AccountType{
 	{"auto_loan", "Auto Loan", true, true},
 	{"loan", "Loan", true, false},
 	{"other", "Other", false, false},
+}
+
+// liabilityExcludeSQL returns a SQL predicate that is true for transactions
+// NOT on a liability-typed account. Inflows on loans/cards are debt paydowns
+// or refunds, not real income. Keys come from AccountTypes (our own constants,
+// not user input) so inlining them is injection-safe.
+func liabilityExcludeSQL() string {
+	var keys []string
+	for _, t := range AccountTypes {
+		if t.Liability {
+			keys = append(keys, "'"+t.Key+"'")
+		}
+	}
+	return "COALESCE(a.type,'') NOT IN (" + strings.Join(keys, ",") + ")"
 }
 
 // HasAsset reports whether a type carries an underlying asset value.
