@@ -44,9 +44,7 @@ func (a *App) buildDashboard() gtk.Widgetter {
 		}))
 	}
 	if stats, err := a.st.SpendByCategory(a.pid, start, end); err == nil && len(stats) > 0 {
-		body.Append(chartCard("By category — last 30 days", 200, func(cr *cairo.Context, w, h int, ink chartInk) {
-			drawPieChart(cr, w, h, stats, ink)
-		}))
+		body.Append(a.pieCard("By category — last 30 days", 200, stats))
 	}
 
 	// Accounts overview.
@@ -81,6 +79,28 @@ func (a *App) buildDashboard() gtk.Widgetter {
 	}
 
 	return pageBody(body)
+}
+
+// pieCard is a chart card whose slices/legend rows navigate to the Transactions
+// page filtered to the clicked category (like the web app).
+func (a *App) pieCard(title string, height int, stats []store.CategoryStat) gtk.Widgetter {
+	da := chartArea(height, func(cr *cairo.Context, w, h int, ink chartInk) {
+		drawPieChart(cr, w, h, stats, ink)
+	})
+	click := gtk.NewGestureClick()
+	click.ConnectReleased(func(_ int, x, y float64) {
+		if cat := pieSliceAt(x, y, da.Width(), da.Height(), stats); cat != "" {
+			a.showCategoryTxns(cat)
+		}
+	})
+	da.AddController(click)
+
+	box := vbox(8)
+	box.AddCSSClass("card")
+	box.AddCSSClass("stat")
+	box.Append(sectionLabel(title))
+	box.Append(da)
+	return box
 }
 
 // errorState renders a query failure inline so a broken page doesn't blank the

@@ -205,6 +205,55 @@ func drawPieChart(cr *cairo.Context, w, h int, stats []store.CategoryStat, ink c
 	}
 }
 
+// pieSliceAt returns the category whose pie wedge (or legend row) contains the
+// point (px,py), or "" if none. Geometry MUST stay in sync with drawPieChart.
+func pieSliceAt(px, py float64, w, h int, stats []store.CategoryStat) string {
+	W, H := float64(w), float64(h)
+	total := 0.0
+	for _, s := range stats {
+		total += s.Amount
+	}
+	if total <= 0 {
+		return ""
+	}
+	radius := math.Min(H/2-8, W/4)
+	if radius < 8 {
+		return ""
+	}
+	cx, cy := 12+radius, H/2
+
+	// Pie wedge: inside the circle, find the slice spanning the click's angle.
+	if dx, dy := px-cx, py-cy; dx*dx+dy*dy <= radius*radius {
+		theta := math.Atan2(dy, dx)
+		start := -math.Pi / 2
+		for theta < start {
+			theta += 2 * math.Pi
+		}
+		ang := start
+		for _, s := range stats {
+			a2 := ang + (s.Amount/total)*2*math.Pi
+			if theta >= ang && theta < a2 {
+				return s.Category
+			}
+			ang = a2
+		}
+	}
+
+	// Legend rows to the pie's right.
+	lx := cx + radius + 24
+	ly := 16.0
+	for _, s := range stats {
+		if ly > H-6 {
+			break
+		}
+		if px >= lx && py >= ly-12 && py <= ly+6 {
+			return s.Category
+		}
+		ly += 20
+	}
+	return ""
+}
+
 func drawNoData(cr *cairo.Context, W, H float64, ink chartInk) {
 	cr.SetSourceRGBA(ink.r, ink.g, ink.b, 0.5)
 	cr.SelectFontFace("sans-serif", cairo.FontSlantNormal, cairo.FontWeightNormal)
