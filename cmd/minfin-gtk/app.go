@@ -182,6 +182,14 @@ func (a *App) refreshPage(name string) {
 	}
 }
 
+// showCategoryTxns jumps to the Transactions page filtered to one category,
+// clearing other filters (mirrors clicking a category in the web app).
+func (a *App) showCategoryTxns(category string) {
+	a.txn = txnState{category: category}
+	a.refreshPage("transactions")
+	a.stack.SetVisibleChildName("transactions")
+}
+
 func (a *App) toast(msg string) {
 	if a.toasts != nil {
 		a.toasts.AddToast(adw.NewToast(msg))

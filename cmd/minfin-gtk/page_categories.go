@@ -46,6 +46,9 @@ func (a *App) categoriesGroup(cats []store.Category) gtk.Widgetter {
 		row := actionRow()
 		row.AddPrefix(colorSwatch(c.Color))
 		row.SetTitle(c.Name)
+		row.SetActivatable(true)
+		row.SetTooltipText("View transactions in this category")
+		row.ConnectActivated(func() { a.showCategoryTxns(c.Name) })
 
 		sw := gtk.NewSwitch()
 		sw.SetActive(c.Exclude)
