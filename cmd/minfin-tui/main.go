@@ -4,7 +4,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -12,11 +11,12 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/zackb/minfin/internal/dashboard"
+	"github.com/zackb/minfin/internal/env"
 	"github.com/zackb/minfin/internal/store"
 )
 
 func main() {
-	st, err := store.Open(getenv("MINFIN_DB", "minfin.db"))
+	st, err := store.Open(env.DBPath())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -29,13 +29,6 @@ func main() {
 	if _, err := tea.NewProgram(model{st: st, d: d}).Run(); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func getenv(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
 }
 
 // for now loads once at startup; 'r' reloads. No live tail of the DB

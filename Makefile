@@ -1,7 +1,13 @@
-.PHONY: build tui gtk demo-tui demo-gtk test run fmt clean
+.PHONY: build tui gtk demo-tui demo-gtk test run fmt clean icons install-gtk uninstall-gtk
 
 # Throwaway DB for the demo targets — never the live minfin.db.
 DEMO_DB ?= /tmp/minfin-demo.db
+
+# User-level install prefix (no sudo). Override PREFIX=/usr/local for a system install.
+PREFIX  ?= $(HOME)/.local
+BINDIR  := $(PREFIX)/bin
+DATADIR := $(PREFIX)/share
+APPID   := com.zackbartel.minfin
 
 all: build tui gtk
 
@@ -37,3 +43,23 @@ fmt:
 
 clean:
 	rm -rf bin
+
+# Regenerate icons from assets/icon.png (needs ImageMagick). Outputs are committed.
+icons:
+	scripts/generate_icons.sh
+
+# Install the GTK app + desktop entry + icons under $(PREFIX)
+install-gtk: gtk
+	install -Dm755 bin/minfin-gtk $(BINDIR)/minfin-gtk
+	mkdir -p $(DATADIR)/icons/hicolor $(DATADIR)/applications
+	cp -a assets/icons/hicolor/. $(DATADIR)/icons/hicolor/
+	sed 's|@BINDIR@|$(BINDIR)|g' packaging/$(APPID).desktop > $(DATADIR)/applications/$(APPID).desktop
+	-update-desktop-database $(DATADIR)/applications
+	-gtk-update-icon-cache -qtf $(DATADIR)/icons/hicolor
+	@echo "Installed. First run? Migrate data: mv minfin.db $${XDG_DATA_HOME:-$$HOME/.local/share}/minfin/minfin.db"
+
+uninstall-gtk:
+	rm -f $(BINDIR)/minfin-gtk $(DATADIR)/applications/$(APPID).desktop
+	rm -f $(DATADIR)/icons/hicolor/*/apps/$(APPID).png
+	-update-desktop-database $(DATADIR)/applications
+	@echo "Removed minfin-gtk; DB left in place."

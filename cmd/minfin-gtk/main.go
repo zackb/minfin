@@ -14,27 +14,21 @@ import (
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/gio/v2"
 
+	"github.com/zackb/minfin/internal/env"
 	"github.com/zackb/minfin/internal/store"
 )
 
 func main() {
-	st, err := store.Open(getenv("MINFIN_DB", "minfin.db"))
+	st, err := store.Open(env.DBPath())
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer st.Close()
 
 	a := &App{st: st}
-	a.app = adw.NewApplication("com.zackb.minfin", gio.ApplicationFlagsNone)
+	a.app = adw.NewApplication("com.zackbartel.minfin", gio.ApplicationFlagsNone)
 	a.app.ConnectActivate(a.activate)
 	if code := a.app.Run(os.Args); code > 0 {
 		os.Exit(code)
 	}
-}
-
-func getenv(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
 }

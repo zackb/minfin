@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=minfin
+GenericName=Personal Finance
+Comment=Track accounts, spending, and net worth
+Exec=@BINDIR@/minfin-gtk
+Icon=com.zackbartel.minfin
+Terminal=false
+Categories=Office;Finance;GTK;
+StartupWMClass=com.zackbartel.minfin
