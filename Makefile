@@ -1,4 +1,4 @@
-.PHONY: build tui gtk demo-tui demo-gtk test run fmt clean icons install-gtk uninstall-gtk
+.PHONY: build tui gtk desktop windows demo-tui demo-gtk test run fmt clean icons install-gtk uninstall-gtk
 
 # Throwaway DB for the demo targets
 DEMO_DB ?= /tmp/minfin-demo.db
@@ -9,7 +9,7 @@ BINDIR  := $(PREFIX)/bin
 DATADIR := $(PREFIX)/share
 APPID   := com.zackbartel.minfin
 
-all: build tui gtk
+all: build tui gtk desktop
 
 build:
 	go build -o bin/minfin ./cmd/minfin
@@ -19,6 +19,16 @@ tui:
 
 gtk:
 	go build -o bin/minfin-gtk ./cmd/minfin-gtk
+
+# single-user desktop launcher with chromeless window
+desktop:
+	go build -o bin/minfin-desktop ./cmd/minfin-desktop
+
+# windows .exe; -H=windowsgui hides the console window.
+windows:
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "-H=windowsgui" \
+		-o dist/minfin.exe ./cmd/minfin-desktop
+
 
 # Seed a fresh throwaway DB and launch the client against it.
 demo: build
@@ -43,7 +53,7 @@ fmt:
 	go fmt ./...
 
 clean:
-	rm -rf bin
+	rm -rf bin dist
 
 # Regenerate icons from assets/icon.png (needs ImageMagick). Outputs are committed.
 icons:

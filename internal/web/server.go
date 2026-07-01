@@ -31,6 +31,10 @@ type Server struct {
 	auth  *auth.Service
 	mux   *http.ServeMux
 	pages map[string]*template.Template
+	// localUID, when set, puts the server in single-user desktop mode: auth is
+	// bypassed and every request runs as this user. Empty for the multi-user
+	// server. See SetLocalUser.
+	localUID string
 }
 
 func NewServer(s *store.Store, a *auth.Service) *Server {
@@ -75,6 +79,11 @@ func NewServer(s *store.Store, a *auth.Service) *Server {
 
 func (s *Server) Handler() http.Handler { return s.withAuth(s.mux) }
 
+// SetLocalUser switches the server into single-user desktop mode: withAuth
+// skips token checks and runs every request as uid. Used by the desktop
+// launcher so there's no login screen on a local machine.
+func (s *Server) SetLocalUser(uid string) { s.localUID = uid }
+
 type ctxKey int
 
 const (
@@ -108,7 +117,10 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		uid, ok := s.auth.IsAuthenticated(r)
+		uid, ok := s.localUID, s.localUID != ""
+		if !ok {
+			uid, ok = s.auth.IsAuthenticated(r)
+		}
 		if !ok {
 			// API clients get a 401 JSON body; browsers get redirected to login.
 			if strings.HasPrefix(r.URL.Path, "/api/") {
