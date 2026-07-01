@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/zackb/minfin/internal/auth"
 	"github.com/zackb/minfin/internal/env"
@@ -109,10 +110,22 @@ func openWindow(url string) {
 		profile, err := os.MkdirTemp("", "minfin-profile-*")
 		if err == nil {
 			defer os.RemoveAll(profile)
-			cmd := exec.Command(bin, "--app="+url, "--user-data-dir="+profile)
+			cmd := exec.Command(bin,
+				"--app="+url,
+				"--user-data-dir="+profile,
+				"--no-first-run",                   // fresh temp profile => skip first-run UI
+				"--no-default-browser-check",       // no "make me default" nag
+				"--disable-session-crashed-bubble", // no "restore pages?" after we kill it
+				"--window-size=1280,860",           // sane default app window each launch
+			)
 			if err := cmd.Start(); err == nil {
+				start := time.Now()
 				cmd.Wait()
-				return
+				// close blocks here until the user closes the window
+				if time.Since(start) > 3*time.Second {
+					return
+				}
+				select {}
 			}
 		}
 	}
