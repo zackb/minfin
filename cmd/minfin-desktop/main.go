@@ -35,6 +35,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if err := adoptPortfolios(st, uid); err != nil {
+		log.Fatal(err)
+	}
 
 	// auth is bypassed in local mode but NewServer requires a Service; a random
 	// dev secret is fine since no tokens are ever issued or checked.
@@ -78,6 +81,23 @@ func ensureLocalUser(st *store.Store) (string, error) {
 		return "", err
 	}
 	return u.ID, nil
+}
+
+// adoptPortfolios makes the local user a member of every portfolio in the file.
+// The GTK app creates portfolios without membership rows (membership is a
+// server-only concept there), so a fresh desktop user would otherwise see none
+// and be sent to setup. AddMember is INSERT OR IGNORE, so this is idempotent.
+func adoptPortfolios(st *store.Store, uid string) error {
+	ps, err := st.Portfolios()
+	if err != nil {
+		return err
+	}
+	for _, p := range ps {
+		if err := st.AddMember(p.ID, uid, "owner"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // openWindow shows the app. It prefers a Chromium browser in --app mode (a
