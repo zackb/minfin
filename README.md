@@ -30,6 +30,18 @@ I've used every alternative out there and this is the only one that gets it righ
   <img src="assets/demo/transactions-gtk.png" alt="minfin" width="600">
 </p>
 
+## Install
+
+### macOS (Homebrew)
+
+```sh
+brew tap zackb/minfin https://github.com/zackb/minfin
+brew install minfin
+```
+
+This installs `minfin-desktop` (the GUI) and `minfin-tui`. Run `minfin-desktop`
+to launch the app. Upgrade later with `brew upgrade minfin`.
+
 ## Build & run
 
 #### Dependencies

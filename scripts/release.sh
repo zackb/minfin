@@ -73,6 +73,21 @@ gh release create "$TAG" \
     "$LINUX_DESKTOP" "$WIN_DESKTOP" "$LINUX_GTK" \
     --title "Release $TAG" --generate-notes
 
+# 5. Bump the Homebrew formula to point at this tag's source tarball.
+# Homebrew reads the formula from main (the tap), not from inside the tarball,
+# so committing this after the tag is fine.
+echo "🍺 Updating Homebrew formula..."
+FORMULA="$REPO_ROOT/Formula/minfin.rb"
+TARBALL_URL="https://github.com/zackb/minfin/archive/refs/tags/$TAG.tar.gz"
+SHA=$(curl -sL "$TARBALL_URL" | sha256sum | cut -d' ' -f1)
+sed -i \
+    -e "s|archive/refs/tags/v[0-9.]*\.tar\.gz|archive/refs/tags/$TAG.tar.gz|" \
+    -e "s|sha256 \"[a-f0-9]*\"|sha256 \"$SHA\"|" \
+    "$FORMULA"
+git add "$FORMULA"
+git commit -m "brew: bump formula to $TAG"
+git push origin main
+
 # TODO: AUR (minfin-git / minfin-bin) add later.
 
 echo "✅ Release $VERSION deployed to GitHub!"

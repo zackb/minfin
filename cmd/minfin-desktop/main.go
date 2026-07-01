@@ -155,6 +155,27 @@ func findChromium() string {
 				}
 			}
 		}
+	case "darwin":
+		// find macos .app bundles, not on PATH, so probe the
+		// binary inside each bundle in /Applications and ~/Applications.
+		rel := []string{
+			"Google Chrome.app/Contents/MacOS/Google Chrome",
+			"Chromium.app/Contents/MacOS/Chromium",
+			"Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+			"Brave Browser.app/Contents/MacOS/Brave Browser",
+		}
+		dirs := []string{"/Applications"}
+		if home, err := os.UserHomeDir(); err == nil {
+			dirs = append(dirs, filepath.Join(home, "Applications"))
+		}
+		for _, d := range dirs {
+			for _, r := range rel {
+				p := filepath.Join(d, r)
+				if _, err := os.Stat(p); err == nil {
+					return p
+				}
+			}
+		}
 	default:
 		for _, name := range []string{"google-chrome", "chromium", "chromium-browser", "microsoft-edge", "brave-browser"} {
 			if p, err := exec.LookPath(name); err == nil {
