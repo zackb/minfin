@@ -43,8 +43,25 @@ make run        # or: make build && ./bin/minfin
 Then open http://localhost:8080.
 
 Config (all optional):
-- `PORT` — HTTP port (default `8080`)
+- `PORT` — HTTP port for the default loopback bind (default `8080`)
 - `MINFIN_DB` — SQLite path (default `$XDG_DATA_HOME/minfin/minfin.db`) (~/.local/share/minfin/minfin.db)
+- `MINFIN_JWT_SECRET` — signing key for auth tokens. **Required** when not in dev mode.
+- `MINFIN_ADDR` — full listen address (e.g. `:8080`). Overrides the loopback default.
+- `MINFIN_ALLOW_SIGNUP` — set to enable account registration (off by default).
+- `MINFIN_DEV` — dev mode: ephemeral JWT secret, non-Secure cookies.
+
+### Security Consideration
+
+The server speaks plain HTTP and is not meant to face the internet directly.
+By default it binds to `127.0.0.1`; to expose it, put a TLS-terminating reverse
+proxy (Caddy, nginx) in front and point it at the loopback port, or set
+`MINFIN_ADDR` to bind the proxy's upstream interface. Also set a strong
+`MINFIN_JWT_SECRET` and decide on `MINFIN_ALLOW_SIGNUP`.
+
+The SQLite database holds bank balances, full transaction history, and the SimpleFIN
+access URL. `minfin` locks the DB file to owner-only
+(`0600`), but it is not encrypted at rest and relies on full-disk encryption on
+the host.
 
 ## SimpleFIN token
 

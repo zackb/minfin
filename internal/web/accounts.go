@@ -47,7 +47,7 @@ func (s *Server) handleAccountType(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.SetAccountType(portfolioID(r), id, typ); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serverError(w, r.URL.Path, err)
 		return
 	}
 	http.Redirect(w, r, "/accounts", http.StatusSeeOther)
@@ -68,7 +68,7 @@ func (s *Server) handleAccountAssetValue(w http.ResponseWriter, r *http.Request)
 	}
 	cents := int64(math.Round(dollars * 100))
 	if err := s.store.SetAccountAssetValue(portfolioID(r), id, cents); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serverError(w, r.URL.Path, err)
 		return
 	}
 	http.Redirect(w, r, "/accounts", http.StatusSeeOther)
@@ -82,7 +82,7 @@ func (s *Server) handleAccountNickname(w http.ResponseWriter, r *http.Request) {
 	}
 	nick := strings.TrimSpace(r.FormValue("nickname"))
 	if err := s.store.SetAccountNickname(portfolioID(r), id, nick); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serverError(w, r.URL.Path, err)
 		return
 	}
 	http.Redirect(w, r, "/accounts", http.StatusSeeOther)

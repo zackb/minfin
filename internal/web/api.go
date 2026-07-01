@@ -64,6 +64,13 @@ func apiError(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, map[string]string{"error": msg})
 }
 
+// apiServerError logs the real error and returns a generic 500, so internal/DB
+// detail never leaks in the JSON body.
+func apiServerError(w http.ResponseWriter, err error) {
+	log.Printf("api: %v", err)
+	apiError(w, http.StatusInternalServerError, "internal server error")
+}
+
 // decode reads a JSON request body into dst; reports false (and writes 400) on
 // malformed input.
 func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
@@ -82,6 +89,14 @@ type credentials struct {
 }
 
 func (s *Server) apiSignup(w http.ResponseWriter, r *http.Request) {
+	if !s.allowSignup {
+		apiError(w, http.StatusForbidden, "signup is disabled")
+		return
+	}
+	if !s.loginLimiter.allow(clientIP(r)) {
+		apiError(w, http.StatusTooManyRequests, "too many attempts")
+		return
+	}
 	var c credentials
 	if !decode(w, r, &c) {
 		return
@@ -93,7 +108,7 @@ func (s *Server) apiSignup(w http.ResponseWriter, r *http.Request) {
 	}
 	hash, err := auth.HashPassword(c.Password)
 	if err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	u, err := s.store.CreateUser(email, hash)
@@ -102,13 +117,17 @@ func (s *Server) apiSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	s.issueToken(w, u.ID)
 }
 
 func (s *Server) apiLogin(w http.ResponseWriter, r *http.Request) {
+	if !s.loginLimiter.allow(clientIP(r)) {
+		apiError(w, http.StatusTooManyRequests, "too many attempts")
+		return
+	}
 	var c credentials
 	if !decode(w, r, &c) {
 		return
@@ -124,7 +143,7 @@ func (s *Server) apiLogin(w http.ResponseWriter, r *http.Request) {
 func (s *Server) issueToken(w http.ResponseWriter, userID string) {
 	tok, err := s.auth.CreateToken(userID)
 	if err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"token": tok})
@@ -163,11 +182,11 @@ func (s *Server) apiSetup(w http.ResponseWriter, r *http.Request) {
 	}
 	pid, err := s.store.CreatePortfolio("", access)
 	if err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	if err := s.store.AddMember(pid, userID(r), "owner"); err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	if err := syncer.Sync(s.store, pid, access); err != nil {
@@ -201,7 +220,7 @@ func (s *Server) apiAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 	accts, err := s.store.Accounts(pid, time.Now())
 	if err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	assets, liabilities, net := summarize(accts)
@@ -224,7 +243,7 @@ func (s *Server) apiAccountType(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.SetAccountType(portfolioID(r), body.ID, body.Type); err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -240,7 +259,7 @@ func (s *Server) apiAccountNickname(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.SetAccountNickname(portfolioID(r), body.ID, strings.TrimSpace(body.Nickname)); err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -260,7 +279,7 @@ func (s *Server) apiAccountAssetValue(w http.ResponseWriter, r *http.Request) {
 	}
 	cents := int64(math.Round(body.Value * 100))
 	if err := s.store.SetAccountAssetValue(portfolioID(r), body.ID, cents); err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -298,7 +317,7 @@ func (s *Server) apiTransactions(w http.ResponseWriter, r *http.Request) {
 		Offset:      (page - 1) * txnPageSize,
 	})
 	if err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	if rules, err := s.store.Rules(pid); err == nil {
@@ -362,22 +381,22 @@ func (s *Server) apiCategories(w http.ResponseWriter, r *http.Request) {
 	}
 	spend, err := s.store.SpendByCategory(pid, start, end)
 	if err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	income, err := s.store.IncomeByCategory(pid, start, end)
 	if err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	cats, err := s.store.Categories(pid)
 	if err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	rules, err := s.store.Rules(pid)
 	if err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	out["spend"], out["income"], out["categories"], out["rules"] = spend, income, cats, rules
@@ -397,7 +416,7 @@ func (s *Server) apiCategoryAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.AddCategory(portfolioID(r), name); err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -410,7 +429,7 @@ func (s *Server) apiCategoryDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.DeleteCategory(portfolioID(r), name); err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -429,7 +448,7 @@ func (s *Server) apiCategoryExclude(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.SetCategoryExclude(portfolioID(r), body.Name, body.Exclude); err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -438,7 +457,7 @@ func (s *Server) apiCategoryExclude(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiRecategorize(w http.ResponseWriter, r *http.Request) {
 	updated, err := s.store.ApplyRules(portfolioID(r), true)
 	if err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]int{"updated": updated})
@@ -468,7 +487,7 @@ func (s *Server) apiRuleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.DeleteRule(portfolioID(r), id); err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -497,12 +516,12 @@ func (s *Server) apiSpending(w http.ResponseWriter, r *http.Request) {
 	start, end := daterange.Resolve(rng, time.Now())
 	series, err := s.store.SpendingSeries(pid, start, end, interval, split)
 	if err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	payees, err := s.store.TopPayees(pid, start, end, 15)
 	if err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiServerError(w, err)
 		return
 	}
 	out["series"], out["payees"] = series, payees

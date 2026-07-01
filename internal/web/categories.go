@@ -109,19 +109,19 @@ func (s *Server) handleTxnCategory(w http.ResponseWriter, r *http.Request) {
 		pattern := strings.TrimSpace(orDefault(r.FormValue("pattern"), r.FormValue("payee")))
 		if pattern != "" {
 			if err := s.store.AddRule(pid, pattern, category); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				serverError(w, r.URL.Path, err)
 				return
 			}
 		}
 	}
-	http.Redirect(w, r, orDefault(r.Header.Get("Referer"), "/transactions"), http.StatusSeeOther)
+	http.Redirect(w, r, safeReferer(r, "/transactions"), http.StatusSeeOther)
 }
 
 func (s *Server) handleCategoryAdd(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.FormValue("name"))
 	if name != "" {
 		if err := s.store.AddCategory(portfolioID(r), name); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			serverError(w, r.URL.Path, err)
 			return
 		}
 	}
@@ -131,7 +131,7 @@ func (s *Server) handleCategoryAdd(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCategoryDelete(w http.ResponseWriter, r *http.Request) {
 	if name := r.FormValue("name"); name != "" {
 		if err := s.store.DeleteCategory(portfolioID(r), name); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			serverError(w, r.URL.Path, err)
 			return
 		}
 	}
@@ -141,7 +141,7 @@ func (s *Server) handleCategoryDelete(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCategoryExclude(w http.ResponseWriter, r *http.Request) {
 	if name := r.FormValue("name"); name != "" {
 		if err := s.store.SetCategoryExclude(portfolioID(r), name, r.FormValue("exclude") == "1"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			serverError(w, r.URL.Path, err)
 			return
 		}
 	}
@@ -163,7 +163,7 @@ func (s *Server) handleRuleAdd(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleRuleDelete(w http.ResponseWriter, r *http.Request) {
 	if id, err := strconv.ParseInt(r.FormValue("id"), 10, 64); err == nil {
 		if err := s.store.DeleteRule(portfolioID(r), id); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			serverError(w, r.URL.Path, err)
 			return
 		}
 	}
@@ -174,7 +174,7 @@ func (s *Server) handleRecategorize(w http.ResponseWriter, r *http.Request) {
 	// Manual button overwrites: re-apply rules over already-categorized rows so
 	// stale/mis-matched categories get corrected.
 	if _, err := s.store.ApplyRules(portfolioID(r), true); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serverError(w, r.URL.Path, err)
 		return
 	}
 	http.Redirect(w, r, "/categories", http.StatusSeeOther)

@@ -76,6 +76,57 @@ func TestAuthGating(t *testing.T) {
 	}
 }
 
+func TestSignupGatedOffByDefault(t *testing.T) {
+	e := newEnv(t)
+	t.Setenv("MINFIN_ALLOW_SIGNUP", "") // override newEnv: signup disabled
+	s := NewServer(e.s.store, e.s.auth)
+	form := url.Values{"email": {"nope@test.example"}, "password": {"longenough"}}
+	req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("signup with MINFIN_ALLOW_SIGNUP unset = %d, want 403", rec.Code)
+	}
+}
+
+func TestSecurityHeaders(t *testing.T) {
+	e := newEnv(t)
+	req := httptest.NewRequest(http.MethodGet, "/login", nil)
+	rec := httptest.NewRecorder()
+	e.s.Handler().ServeHTTP(rec, req)
+	for _, h := range []string{"Content-Security-Policy", "X-Frame-Options", "X-Content-Type-Options"} {
+		if rec.Header().Get(h) == "" {
+			t.Errorf("missing %s header", h)
+		}
+	}
+}
+
+func TestLocalModeRejectsForeignHost(t *testing.T) {
+	e := newEnv(t)
+	s := NewServer(e.s.store, e.s.auth)
+	s.SetLocalUser("local-uid") // desktop mode: auth bypassed, Host check is the guard
+	h := s.Handler()
+
+	// A DNS-rebinding page presents an attacker Host -> rejected.
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "evil.example"
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("foreign Host = %d, want 403", rec.Code)
+	}
+
+	// A loopback Host passes the guard (auth is bypassed in local mode).
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "127.0.0.1:53211"
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code == http.StatusForbidden {
+		t.Fatalf("loopback Host = 403, want it allowed")
+	}
+}
+
 func TestLoginWrongPassword(t *testing.T) {
 	e := newEnv(t) // seeds user@test.example / password123
 	form := url.Values{"email": {"user@test.example"}, "password": {"wrong"}}

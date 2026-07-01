@@ -7,9 +7,13 @@ import (
 	"embed"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/zackb/minfin/internal/auth"
 	"github.com/zackb/minfin/internal/simplefin"
@@ -35,13 +39,20 @@ type Server struct {
 	// bypassed and every request runs as this user. Empty for the multi-user
 	// server. See SetLocalUser.
 	localUID string
+	// allowSignup gates the registration endpoints. Off unless MINFIN_ALLOW_SIGNUP
+	// is set, so an exposed server isn't openly registerable.
+	allowSignup bool
+	// loginLimiter throttles the auth endpoints per client IP.
+	loginLimiter *rateLimiter
 }
 
 func NewServer(s *store.Store, a *auth.Service) *Server {
 	srv := &Server{
-		store: s,
-		auth:  a,
-		mux:   http.NewServeMux(),
+		store:        s,
+		auth:         a,
+		mux:          http.NewServeMux(),
+		allowSignup:  os.Getenv("MINFIN_ALLOW_SIGNUP") != "",
+		loginLimiter: newRateLimiter(10, time.Minute),
 		pages: map[string]*template.Template{
 			"home":         page("home.html"),
 			"spending":     page("spending.html"),
@@ -77,7 +88,51 @@ func NewServer(s *store.Store, a *auth.Service) *Server {
 	return srv
 }
 
-func (s *Server) Handler() http.Handler { return s.withAuth(s.mux) }
+func (s *Server) Handler() http.Handler {
+	var h http.Handler = s.withAuth(s.mux)
+	h = securityHeaders(h)
+	if s.localUID != "" {
+		// Desktop mode bypasses auth entirely, so the Host check is the only thing
+		// between the loopback server and a DNS-rebinding page in the user's browser.
+		h = localhostOnly(h)
+	}
+	return h
+}
+
+// securityHeaders adds defense-in-depth response headers. The CSP allows
+// 'unsafe-inline' because the templates use inline <script>/style; nonces are
+// the upgrade path if inline is ever removed. HSTS is safe to always send —
+// browsers ignore it over plain HTTP (so it only bites once TLS is in front).
+func securityHeaders(next http.Handler) http.Handler {
+	const csp = "default-src 'self'; img-src 'self' data:; " +
+		"script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+		"base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Content-Security-Policy", csp)
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// localhostOnly rejects requests whose Host isn't loopback, defeating DNS
+// rebinding against the auth-bypassed desktop server.
+func localhostOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host := r.Host
+		if h, _, err := net.SplitHostPort(r.Host); err == nil {
+			host = h
+		}
+		if host != "127.0.0.1" && host != "localhost" && host != "::1" {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
 
 // SetLocalUser switches the server into single-user desktop mode: withAuth
 // skips token checks and runs every request as uid. Used by the desktop
@@ -216,7 +271,7 @@ func (s *Server) base(r *http.Request, active string) viewBase {
 func (s *Server) render(w http.ResponseWriter, name string, v any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.pages[name].ExecuteTemplate(w, "layout", v); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serverError(w, "render "+name, err)
 	}
 }
 
@@ -229,12 +284,16 @@ type authView struct {
 func (s *Server) renderAuth(w http.ResponseWriter, name string, v authView) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.pages[name].ExecuteTemplate(w, name, v); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serverError(w, "render "+name, err)
 	}
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
+		if !s.loginLimiter.allow(clientIP(r)) {
+			s.renderAuth(w, "login", authView{Error: "Too many attempts. Try again in a minute."})
+			return
+		}
 		email := strings.TrimSpace(r.FormValue("email"))
 		u, err := s.store.UserByEmail(email)
 		if err != nil || !auth.CheckPassword(u.PasswordHash, r.FormValue("password")) {
@@ -243,7 +302,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		tok, err := s.auth.CreateToken(u.ID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			serverError(w, "login: create token", err)
 			return
 		}
 		s.auth.SetCookie(w, tok)
@@ -254,7 +313,15 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
+	if !s.allowSignup {
+		http.Error(w, "signup is disabled", http.StatusForbidden)
+		return
+	}
 	if r.Method == http.MethodPost {
+		if !s.loginLimiter.allow(clientIP(r)) {
+			s.renderAuth(w, "signup", authView{Error: "Too many attempts. Try again in a minute."})
+			return
+		}
 		email := strings.TrimSpace(r.FormValue("email"))
 		pw := r.FormValue("password")
 		if email == "" || len(pw) < 8 {
@@ -263,7 +330,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		}
 		hash, err := auth.HashPassword(pw)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			serverError(w, "signup: hash", err)
 			return
 		}
 		u, err := s.store.CreateUser(email, hash)
@@ -272,12 +339,12 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			serverError(w, "signup: create user", err)
 			return
 		}
 		tok, err := s.auth.CreateToken(u.ID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			serverError(w, "signup: create token", err)
 			return
 		}
 		s.auth.SetCookie(w, tok)
@@ -285,6 +352,13 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.renderAuth(w, "signup", authView{})
+}
+
+// serverError logs the real error and returns a generic 500, so DB/internal
+// detail never leaks to the client.
+func serverError(w http.ResponseWriter, context string, err error) {
+	log.Printf("%s: %v", context, err)
+	http.Error(w, "internal server error", http.StatusInternalServerError)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -300,16 +374,16 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 	access, err := simplefin.Claim(token)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		http.Error(w, "could not claim setup token: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 	pid, err := s.store.CreatePortfolio("", access)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serverError(w, "setup: create portfolio", err)
 		return
 	}
 	if err := s.store.AddMember(pid, userID(r), "owner"); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serverError(w, "setup: add member", err)
 		return
 	}
 	if err := syncer.Sync(s.store, pid, access); err != nil {
@@ -326,7 +400,7 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	http.Redirect(w, r, orDefault(r.Header.Get("Referer"), "/"), http.StatusSeeOther)
+	http.Redirect(w, r, safeReferer(r, "/"), http.StatusSeeOther)
 }
 
 func orDefault(s, def string) string {
@@ -334,4 +408,23 @@ func orDefault(s, def string) string {
 		return def
 	}
 	return s
+}
+
+// safeReferer returns a same-origin redirect target derived from the Referer, so
+// a post-action redirect can't be pointed at an external site. A Referer for
+// another host (or an unparseable one) falls back to def; a same-host one is
+// reduced to its path+query so the redirect stays local.
+func safeReferer(r *http.Request, def string) string {
+	ref := r.Header.Get("Referer")
+	if ref == "" {
+		return def
+	}
+	u, err := url.Parse(ref)
+	if err != nil || (u.Host != "" && u.Host != r.Host) || u.Path == "" {
+		return def
+	}
+	if u.RawQuery != "" {
+		return u.Path + "?" + u.RawQuery
+	}
+	return u.Path
 }

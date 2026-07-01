@@ -28,7 +28,8 @@ func main() {
 	go syncer.SyncAll(st) // non-blocking startup sync of all portfolios
 	go syncer.Loop(st, 6*time.Hour)
 
-	addr := ":" + env.Get("PORT", "8080")
-	log.Printf("listening on http://localhost%s", addr)
+	// default to loopback
+	addr := env.Get("MINFIN_ADDR", "127.0.0.1:"+env.Get("PORT", "8080"))
+	log.Printf("listening on http://%s", addr)
 	log.Fatal(http.ListenAndServe(addr, web.NewServer(st, authSvc).Handler()))
 }

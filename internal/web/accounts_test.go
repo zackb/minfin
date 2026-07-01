@@ -23,6 +23,7 @@ type env struct {
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
+	t.Setenv("MINFIN_ALLOW_SIGNUP", "1") // signup is gated off by default; tests need it on
 	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatal(err)

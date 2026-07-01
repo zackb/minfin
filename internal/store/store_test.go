@@ -1,12 +1,31 @@
 package store
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/zackb/minfin/internal/simplefin"
 )
+
+// The DB file carries bank credentials + financial data, so Open must lock it to
+// owner-only (0600) regardless of umask.
+func TestOpenLocksFilePerms(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "perms.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := fi.Mode().Perm(); perm != 0o600 {
+		t.Fatalf("db perms = %o, want 600", perm)
+	}
+}
 
 // testPID is the portfolio every seeded fixture lives under.
 const testPID = "p1"

@@ -5,6 +5,8 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/zackb/minfin/internal/simplefin"
 	_ "modernc.org/sqlite"
@@ -88,6 +90,13 @@ func Open(path string) (*Store, error) {
 	}
 	if _, err := db.Exec(schema); err != nil {
 		return nil, fmt.Errorf("schema: %w", err)
+	}
+
+	// owner-only
+	if !strings.HasPrefix(path, ":memory:") && !strings.Contains(path, "mode=memory") {
+		if err := os.Chmod(path, 0o600); err != nil {
+			return nil, fmt.Errorf("chmod db: %w", err)
+		}
 	}
 	return &Store{db}, nil
 }
