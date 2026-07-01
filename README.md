@@ -36,8 +36,11 @@ I've used every alternative out there and this is the only one that gets it righ
 
 ```sh
 brew tap zackb/minfin https://github.com/zackb/minfin
+brew trust zackb/minfin
 brew install minfin
 ```
+
+(`brew trust` is required once because this is a third-party tap.)
 
 This installs `minfin-desktop` (the GUI) and `minfin-tui`. Run `minfin-desktop`
 to launch the app. Upgrade later with `brew upgrade minfin`.
