@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"html/template"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -48,7 +49,7 @@ func toPie(stats []store.CategoryStat) pieData {
 var palette = []string{"#26c6da", "#7e57c2", "#66bb6a", "#ffa726", "#ef5350", "#42a5f5", "#ec407a", "#26a69a"}
 
 func (s *Server) handleCategories(w http.ResponseWriter, r *http.Request) {
-	v := categoriesView{viewBase: s.base(r, "categories")}
+	v := categoriesView{viewBase: s.base(w, r, "categories")}
 	if !v.Connected {
 		s.render(w, "categories", v)
 		return
@@ -62,24 +63,24 @@ func (s *Server) handleCategories(w http.ResponseWriter, r *http.Request) {
 	end := parseDate(v.To, now).AddDate(0, 0, 1)
 
 	if spend, err := s.store.SpendByCategory(pid, start, end); err != nil {
-		v.Error = err.Error()
+		v.failed("categories: spend", err)
 	} else {
 		v.Spend = spend
 		v.SpendJSON = marshalPie(spend)
 	}
 	if income, err := s.store.IncomeByCategory(pid, start, end); err != nil {
-		v.Error = err.Error()
+		v.failed("categories: income", err)
 	} else {
 		v.Income = income
 		v.IncomeJSON = marshalPie(income)
 	}
 	if cats, err := s.store.Categories(pid); err != nil {
-		v.Error = err.Error()
+		v.failed("categories: list", err)
 	} else {
 		v.Categories = cats
 	}
 	if rules, err := s.store.Rules(pid); err != nil {
-		v.Error = err.Error()
+		v.failed("categories: rules", err)
 	} else {
 		v.Rules = rules
 	}
@@ -97,12 +98,15 @@ func (s *Server) handleTxnCategory(w http.ResponseWriter, r *http.Request) {
 	id := r.FormValue("id")
 	category := r.FormValue("category")
 	if id == "" {
-		http.Error(w, "transaction id required", http.StatusBadRequest)
+		flash(w, "That transaction couldn't be categorized.")
+		http.Redirect(w, r, safeReferer(r, "/transactions"), http.StatusSeeOther)
 		return
 	}
 	pid := portfolioID(r)
 	if err := s.store.SetTxnCategory(pid, id, category); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Printf("txn category: %v", err)
+		flash(w, "That transaction couldn't be categorized.")
+		http.Redirect(w, r, safeReferer(r, "/transactions"), http.StatusSeeOther)
 		return
 	}
 	if r.FormValue("remember") != "" && category != "" {
@@ -153,7 +157,9 @@ func (s *Server) handleRuleAdd(w http.ResponseWriter, r *http.Request) {
 	category := r.FormValue("category")
 	if pattern != "" && category != "" {
 		if err := s.store.AddRule(portfolioID(r), pattern, category); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			log.Printf("rule add: %v", err)
+			flash(w, "That rule couldn't be saved.")
+			http.Redirect(w, r, "/categories", http.StatusSeeOther)
 			return
 		}
 	}

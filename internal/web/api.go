@@ -152,7 +152,7 @@ func (s *Server) issueToken(w http.ResponseWriter, userID string) {
 // apiMe reports the signed-in user and whether they've connected SimpleFIN yet,
 // so clients know whether to show the onboarding flow.
 func (s *Server) apiMe(w http.ResponseWriter, r *http.Request) {
-	b := s.base(r, "")
+	b := s.base(w, r, "")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"email":     b.Email,
 		"connected": b.Connected,
@@ -177,7 +177,8 @@ func (s *Server) apiSetup(w http.ResponseWriter, r *http.Request) {
 	}
 	access, err := simplefin.Claim(token)
 	if err != nil {
-		apiError(w, http.StatusBadGateway, err.Error())
+		log.Printf("api setup: claim: %v", err)
+		apiError(w, http.StatusBadGateway, "That setup token didn't work. Copy the full token from bridge.simplefin.org and try again.")
 		return
 	}
 	pid, err := s.store.CreatePortfolio("", access)
@@ -347,14 +348,16 @@ func (s *Server) apiTxnCategory(w http.ResponseWriter, r *http.Request) {
 	}
 	pid := portfolioID(r)
 	if err := s.store.SetTxnCategory(pid, body.ID, body.Category); err != nil {
-		apiError(w, http.StatusBadRequest, err.Error())
+		log.Printf("api txn category: %v", err)
+		apiError(w, http.StatusBadRequest, "That transaction couldn't be categorized.")
 		return
 	}
 	if body.Remember && body.Category != "" {
 		pattern := strings.TrimSpace(orDefault(body.Pattern, body.Payee))
 		if pattern != "" {
 			if err := s.store.AddRule(pid, pattern, body.Category); err != nil {
-				apiError(w, http.StatusBadRequest, err.Error())
+				log.Printf("api rule add: %v", err)
+				apiError(w, http.StatusBadRequest, "That rule couldn't be saved.")
 				return
 			}
 		}
@@ -474,7 +477,8 @@ func (s *Server) apiRuleAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.AddRule(portfolioID(r), pattern, body.Category); err != nil {
-		apiError(w, http.StatusBadRequest, err.Error())
+		log.Printf("api rule add: %v", err)
+		apiError(w, http.StatusBadRequest, "That rule couldn't be saved.")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

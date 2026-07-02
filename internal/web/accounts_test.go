@@ -71,12 +71,30 @@ func get(t *testing.T, e *env, path string) *httptest.ResponseRecorder {
 
 func post(t *testing.T, e *env, path string, form url.Values) int {
 	t.Helper()
+	return postRec(t, e, path, form).Code
+}
+
+// postRec is like post but returns the recorder, for asserting on the flash
+// cookie a failed action sets before redirecting.
+func postRec(t *testing.T, e *env, path string, form url.Values) *httptest.ResponseRecorder {
+	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(e.cookie)
 	rec := httptest.NewRecorder()
 	e.s.Handler().ServeHTTP(rec, req)
-	return rec.Code
+	return rec
+}
+
+// flashed reports whether the response set a non-empty flash cookie, i.e. the
+// handler took its friendly-error path rather than succeeding silently.
+func flashed(rec *httptest.ResponseRecorder) bool {
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "minfin_flash" && c.MaxAge >= 0 && c.Value != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func TestSummarizeWithAsset(t *testing.T) {
@@ -103,8 +121,8 @@ func TestSummarizeWithAsset(t *testing.T) {
 
 func TestHandleAccountType(t *testing.T) {
 	e := newEnv(t)
-	if code := post(t, e, "/accounts/type", url.Values{"id": {"a1"}, "type": {"bogus"}}); code != http.StatusBadRequest {
-		t.Errorf("invalid type: got %d, want 400", code)
+	if rec := postRec(t, e, "/accounts/type", url.Values{"id": {"a1"}, "type": {"bogus"}}); rec.Code != http.StatusSeeOther || !flashed(rec) {
+		t.Errorf("invalid type: got %d flash=%v, want 303 with flash", rec.Code, flashed(rec))
 	}
 	if code := post(t, e, "/accounts/type", url.Values{"id": {"a1"}, "type": {"checking"}}); code != http.StatusSeeOther {
 		t.Errorf("valid type: got %d, want 303", code)

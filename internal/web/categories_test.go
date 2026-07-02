@@ -43,10 +43,10 @@ func TestHandleTxnCategoryAndRemember(t *testing.T) {
 		t.Fatalf("rules = %+v; want one rule updated to Shopping", rules)
 	}
 
-	if code := post(t, e, "/transactions/category", url.Values{
+	if rec := postRec(t, e, "/transactions/category", url.Values{
 		"id": {"t1"}, "category": {"Nope"},
-	}); code != http.StatusBadRequest {
-		t.Errorf("unknown category: got %d, want 400", code)
+	}); rec.Code != http.StatusSeeOther || !flashed(rec) {
+		t.Errorf("unknown category: got %d flash=%v, want 303 with flash", rec.Code, flashed(rec))
 	}
 }
 

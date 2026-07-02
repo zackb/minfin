@@ -104,6 +104,29 @@ th {
   margin: 0 0 .75rem;
 }
 
+/* One-shot toast (flash messages). Fixed, self-dismisses via layout.html JS. */
+.toast {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  max-width: min(360px, calc(100vw - 2rem));
+  z-index: 50;
+  color: #ff8a80;
+  background: #2a1414;
+  border: 1px solid #5d2020;
+  padding: .7rem 1rem;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .4);
+  cursor: pointer;
+  transition: opacity .3s, transform .3s;
+}
+
+.toast.hide {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+
 /* Summary / hero figures */
 .summary { display: flex; gap: 2rem; flex-wrap: wrap; align-items: baseline; }
 .summary .big { font-size: 2rem; font-weight: 600; font-variant-numeric: tabular-nums; }

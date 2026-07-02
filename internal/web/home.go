@@ -25,7 +25,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	v := homeView{viewBase: s.base(r, "dashboard")}
+	v := homeView{viewBase: s.base(w, r, "dashboard")}
 	if !v.Connected {
 		s.render(w, "home", v)
 		return
@@ -35,7 +35,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	accts, err := s.store.Accounts(pid, now)
 	if err != nil {
-		v.Error = err.Error()
+		v.failed("home: accounts", err)
 	}
 	v.Accounts = accts
 	v.Assets, v.Liabilities, v.NetWorth = summarize(accts)
@@ -45,10 +45,10 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		j, _ := json.Marshal(series)
 		v.ChartJSON = template.JS(j)
 	} else {
-		v.Error = err.Error()
+		v.failed("home: spending series", err)
 	}
 	if v.Payees, err = s.store.TopPayees(pid, start, end, 8); err != nil {
-		v.Error = err.Error()
+		v.failed("home: top payees", err)
 	}
 
 	s.render(w, "home", v)

@@ -32,7 +32,7 @@ func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	pid := portfolioID(r)
 	v := transactionsView{
-		viewBase:  s.base(r, "transactions"),
+		viewBase:  s.base(w, r, "transactions"),
 		AccountID: q.Get("account"),
 		Category:  q.Get("category"),
 		Direction: orDefault(q.Get("dir"), "all"),
@@ -58,11 +58,11 @@ func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 
 	accts, err := s.store.AccountList(pid)
 	if err != nil {
-		v.Error = err.Error()
+		v.failed("transactions: account list", err)
 	}
 	v.Accounts = accts
 	if cats, err := s.store.Categories(pid); err != nil {
-		v.Error = err.Error()
+		v.failed("transactions: categories", err)
 	} else {
 		v.Categories = cats
 	}
@@ -79,7 +79,7 @@ func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 		Offset:      (page - 1) * txnPageSize,
 	})
 	if err != nil {
-		v.Error = err.Error()
+		v.failed("transactions: list", err)
 	}
 	// Mark rows whose payee is already covered by a rule, so the "remember"
 	// checkbox reflects real state instead of resetting on every reload.

@@ -236,15 +236,23 @@ type viewBase struct {
 	Connected bool   // the active portfolio has a SimpleFIN token
 	Email     string // signed-in user, for the header/logout affordance
 	Error     string
+	Flash     string   // one-shot toast message from the previous action
 	Notices   []string // SimpleFIN connection warnings from the last sync
 	LastSync  string   // human-readable time of last sync, "" if never
 }
 
+// failed logs the real error and shows a generic message in the page's error
+// banner, so DB/internal detail never leaks to the client.
+func (v *viewBase) failed(context string, err error) {
+	log.Printf("%s: %v", context, err)
+	v.Error = "Something went wrong loading this page. Please try again."
+}
+
 // base builds the per-page layout fields for the signed-in user's active
 // portfolio, including the last sync time and any account-health notices.
-func (s *Server) base(r *http.Request, active string) viewBase {
+func (s *Server) base(w http.ResponseWriter, r *http.Request, active string) viewBase {
 	pid := portfolioID(r)
-	b := viewBase{Active: active, Connected: pid != ""}
+	b := viewBase{Active: active, Connected: pid != "", Flash: takeFlash(w, r)}
 	if u, err := s.store.UserByID(userID(r)); err == nil {
 		b.Email = u.Email
 	}
@@ -361,6 +369,24 @@ func serverError(w http.ResponseWriter, context string, err error) {
 	http.Error(w, "internal server error", http.StatusInternalServerError)
 }
 
+// flash queues a one-shot message rendered as a toast on the next page load.
+// ponytail: cosmetic flash, no signing — app-authored and html-escaped on render.
+func flash(w http.ResponseWriter, msg string) {
+	http.SetCookie(w, &http.Cookie{Name: "minfin_flash", Value: url.QueryEscape(msg),
+		Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 30})
+}
+
+// takeFlash reads and immediately clears the flash cookie.
+func takeFlash(w http.ResponseWriter, r *http.Request) string {
+	c, err := r.Cookie("minfin_flash")
+	if err != nil {
+		return ""
+	}
+	http.SetCookie(w, &http.Cookie{Name: "minfin_flash", Path: "/", MaxAge: -1})
+	v, _ := url.QueryUnescape(c.Value)
+	return v
+}
+
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	s.auth.ClearCookie(w)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -369,12 +395,15 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimSpace(r.FormValue("token"))
 	if token == "" {
-		http.Error(w, "setup token required", http.StatusBadRequest)
+		flash(w, "Please paste a setup token first.")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 	access, err := simplefin.Claim(token)
 	if err != nil {
-		http.Error(w, "could not claim setup token: "+err.Error(), http.StatusBadGateway)
+		log.Printf("setup: claim: %v", err)
+		flash(w, "That setup token didn't work. Copy the full token from bridge.simplefin.org and try again.")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 	pid, err := s.store.CreatePortfolio("", access)

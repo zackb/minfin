@@ -57,6 +57,7 @@
     </aside>
 
     <div class="content">
+        {{if .Flash}}<div class="toast" id="toast" title="Dismiss">{{.Flash}}</div>{{end}}
         {{range .Notices}}<div class="notice">⚠ {{.}}</div>{{end}}
         {{if .Error}}<div class="err">{{.Error}}</div>{{end}}
         {{if .Connected}}{{template "content" .}}{{else}}{{template "setup" .}}{{end}}
@@ -67,6 +68,13 @@
             var collapsed = document.documentElement.classList.toggle('nav-collapsed');
             localStorage.setItem('minfin-nav', collapsed ? 'collapsed' : 'open');
         });
+        (function () {
+            var t = document.getElementById('toast');
+            if (!t) return;
+            var dismiss = function () { t.classList.add('hide'); };
+            t.addEventListener('click', dismiss);
+            setTimeout(dismiss, 6000);
+        })();
     </script>
 </body>
 

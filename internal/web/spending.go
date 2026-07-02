@@ -25,7 +25,7 @@ type spendingView struct {
 func (s *Server) handleSpending(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	v := spendingView{
-		viewBase:        s.base(r, "spending"),
+		viewBase:        s.base(w, r, "spending"),
 		Range:           orDefault(q.Get("range"), "last-30-days"),
 		Interval:        orDefault(q.Get("interval"), "daily"),
 		Split:           q.Get("split") == "1",
@@ -43,7 +43,7 @@ func (s *Server) handleSpending(w http.ResponseWriter, r *http.Request) {
 	start, end := daterange.Resolve(v.Range, time.Now())
 	series, err := s.store.SpendingSeries(pid, start, end, v.Interval, v.Split)
 	if err != nil {
-		v.Error = err.Error()
+		v.failed("spending: series", err)
 		s.render(w, "spending", v)
 		return
 	}
@@ -51,7 +51,7 @@ func (s *Server) handleSpending(w http.ResponseWriter, r *http.Request) {
 	v.ChartJSON = template.JS(j)
 
 	if v.Payees, err = s.store.TopPayees(pid, start, end, 15); err != nil {
-		v.Error = err.Error()
+		v.failed("spending: top payees", err)
 	}
 	s.render(w, "spending", v)
 }
