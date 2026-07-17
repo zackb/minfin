@@ -204,6 +204,59 @@ th {
   font-size: .95rem;
 }
 
+/* Multi-select checkbox dropdown (.ms) — matches .filters select above. */
+.ms { position: relative; }
+.ms > summary {
+  list-style: none;
+  cursor: pointer;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: .5rem 1.6rem .5rem .6rem;
+  font-size: .95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16rem;
+}
+.ms > summary::-webkit-details-marker { display: none; }
+.ms > summary::after {
+  content: "▾";
+  position: absolute;
+  right: .6rem;
+  color: var(--muted);
+}
+.ms-menu {
+  position: absolute;
+  z-index: 20;
+  margin-top: .25rem;
+  min-width: 100%;
+  max-height: 16rem;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: .35rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .4);
+}
+.ms-menu label {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .35rem .5rem;
+  border-radius: 6px;
+  font-size: .9rem;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ms-menu label:hover { background: var(--surface2); }
+.ms-menu input { accent-color: var(--accent); }
+.ms-sep { border: none; border-top: 1px solid var(--line); margin: .35rem .25rem; }
+
 .badge {
   font-size: .7rem;
   color: #ffd180;

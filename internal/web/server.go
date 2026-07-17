@@ -195,7 +195,17 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 	})
 }
 
-var funcs = template.FuncMap{"money": money}
+var funcs = template.FuncMap{"money": money, "has": has}
+
+// has reports whether v is in sl — used to mark multi-select checkboxes checked.
+func has(sl []string, v string) bool {
+	for _, s := range sl {
+		if s == v {
+			return true
+		}
+	}
+	return false
+}
 
 // money formats signed dollars US-style with thousands separators, keeping the
 // $ left of the sign: 1234.5 -> "$1,234.50", -1234.56 -> "-$1,234.56".

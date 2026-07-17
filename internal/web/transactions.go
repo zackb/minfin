@@ -14,29 +14,29 @@ const dateLayout = "2006-01-02"
 
 type transactionsView struct {
 	viewBase
-	From       string // yyyy-mm-dd, for the date inputs
-	To         string
-	AccountID  string
-	Category   string
-	Direction  string
-	Query      string
-	Accounts   []store.AccountRef
-	Categories []store.Category
-	Rows       []store.TxnRow
-	Page       int
-	PrevURL    string // "" if no previous page
-	NextURL    string // "" if no next page
+	From          string // yyyy-mm-dd, for the date inputs
+	To            string
+	SelAccounts   []string // selected account ids (multi)
+	SelCategories []string // selected category values (names + "none"/"budget" sentinels)
+	Direction     string
+	Query         string
+	Accounts      []store.AccountRef
+	Categories    []store.Category
+	Rows          []store.TxnRow
+	Page          int
+	PrevURL       string // "" if no previous page
+	NextURL       string // "" if no next page
 }
 
 func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	pid := portfolioID(r)
 	v := transactionsView{
-		viewBase:  s.base(w, r, "transactions"),
-		AccountID: q.Get("account"),
-		Category:  q.Get("category"),
-		Direction: orDefault(q.Get("dir"), "all"),
-		Query:     q.Get("q"),
+		viewBase:      s.base(w, r, "transactions"),
+		SelAccounts:   q["account"],
+		SelCategories: q["category"],
+		Direction:     orDefault(q.Get("dir"), "all"),
+		Query:         q.Get("q"),
 	}
 	if !v.Connected {
 		s.render(w, "transactions", v)
@@ -71,8 +71,8 @@ func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 		PortfolioID: pid,
 		Start:       start,
 		End:         end,
-		AccountID:   v.AccountID,
-		Category:    v.Category,
+		AccountIDs:  v.SelAccounts,
+		Categories:  v.SelCategories,
 		Direction:   v.Direction,
 		Query:       v.Query,
 		Limit:       txnPageSize,
@@ -94,8 +94,12 @@ func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 	params := url.Values{}
 	setIf(params, "from", v.From)
 	setIf(params, "to", v.To)
-	setIf(params, "account", v.AccountID)
-	setIf(params, "category", v.Category)
+	for _, a := range v.SelAccounts {
+		params.Add("account", a)
+	}
+	for _, c := range v.SelCategories {
+		params.Add("category", c)
+	}
 	if v.Direction != "all" {
 		params.Set("dir", v.Direction)
 	}

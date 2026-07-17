@@ -6,22 +6,27 @@
     <div class="f"><label>From</label><input type="date" name="from" value="{{.From}}"></div>
     <div class="f"><label>To</label><input type="date" name="to" value="{{.To}}"></div>
     <div class="f"><label>Account</label>
-      <select name="account">
-        <option value="">All accounts</option>
-        {{$a := .AccountID}}{{range .Accounts}}
-        <option value="{{.ID}}" {{if eq .ID $a}}selected{{end}}>{{.Name}}</option>
-        {{end}}
-      </select>
+      <details class="ms" data-all="All accounts">
+        <summary>All accounts</summary>
+        <div class="ms-menu">
+          {{range .Accounts}}
+          <label><input type="checkbox" name="account" value="{{.ID}}" {{if has $.SelAccounts .ID}}checked{{end}}> {{.Name}}</label>
+          {{end}}
+        </div>
+      </details>
     </div>
     <div class="f"><label>Category</label>
-      <select name="category">
-        <option value="">All categories</option>
-        {{$c := .Category}}
-        <option value="none" {{if eq $c "none"}}selected{{end}}>Uncategorized</option>
-        {{range .Categories}}
-        <option value="{{.Name}}" {{if eq .Name $c}}selected{{end}}>{{.Name}}</option>
-        {{end}}
-      </select>
+      <details class="ms" data-all="All categories">
+        <summary>All categories</summary>
+        <div class="ms-menu">
+          <label><input type="checkbox" name="category" value="budget" {{if has $.SelCategories "budget"}}checked{{end}}> Budget Only</label>
+          <label><input type="checkbox" name="category" value="none" {{if has $.SelCategories "none"}}checked{{end}}> Uncategorized</label>
+          <hr class="ms-sep">
+          {{range .Categories}}
+          <label><input type="checkbox" name="category" value="{{.Name}}" {{if has $.SelCategories .Name}}checked{{end}}> {{.Name}}</label>
+          {{end}}
+        </div>
+      </details>
     </div>
     <div class="f"><label>Type</label>
       <select name="dir">
@@ -77,4 +82,5 @@
     {{if .NextURL}}<a href="{{.NextURL}}">Next →</a>{{else}}<span class="disabled">Next →</span>{{end}}
   </div>
 </div>
+<script src="/static/js/multiselect.js"></script>
 {{end}}

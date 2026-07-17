@@ -24,7 +24,7 @@ func (a *App) buildTransactions() gtk.Widgetter {
 
 	rows, hasNext, err := a.st.Transactions(store.TxnFilter{
 		PortfolioID: a.pid, Start: start, End: end,
-		AccountID: a.txn.accountID, Category: a.txn.category,
+		AccountIDs: []string{a.txn.accountID}, Categories: []string{a.txn.category},
 		Direction: a.txn.direction, Query: a.txn.query,
 		Limit: 100, Offset: a.txn.page * 100,
 	})
