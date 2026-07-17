@@ -20,6 +20,7 @@ type spendingView struct {
 	IntervalOptions []string
 	ChartJSON       template.JS
 	Payees          []store.PayeeStat
+	From, To        string // resolved range, for linking to /transactions
 }
 
 func (s *Server) handleSpending(w http.ResponseWriter, r *http.Request) {
@@ -41,6 +42,8 @@ func (s *Server) handleSpending(w http.ResponseWriter, r *http.Request) {
 
 	pid := portfolioID(r)
 	start, end := daterange.Resolve(v.Range, time.Now())
+	v.From = start.Format(dateLayout)
+	v.To = end.AddDate(0, 0, -1).Format(dateLayout) // Resolve's end is exclusive; /transactions "to" is inclusive
 	series, err := s.store.SpendingSeries(pid, start, end, v.Interval, v.Split)
 	if err != nil {
 		v.failed("spending: series", err)

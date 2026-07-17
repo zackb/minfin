@@ -31,7 +31,7 @@
       <tr><th>Account</th><th class="num">Balance</th></tr>
       {{range .Accounts}}
       <tr>
-        <td>{{.Display}} <span class="muted">{{.Org}}</span></td>
+        <td><a href="/transactions?account={{.ID}}">{{.Display}}</a> <span class="muted">{{.Org}}</span></td>
         <td class="num {{if lt .Balance 0.0}}neg{{else}}pos{{end}}">{{money .Balance}}</td>
       </tr>
       {{end}}
@@ -45,7 +45,7 @@
     <table>
       <tr><th>Vendor</th><th class="num">Spent</th></tr>
       {{range .Payees}}
-      <tr><td>{{.Payee}}</td><td class="num">{{money .Spent}}</td></tr>
+      <tr><td><a href="/transactions?q={{.Payee | urlquery}}">{{.Payee}}</a></td><td class="num">{{money .Spent}}</td></tr>
       {{end}}
     </table>
     {{else}}<p class="muted">No spending in the last 30 days.</p>{{end}}

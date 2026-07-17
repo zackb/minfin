@@ -26,7 +26,7 @@
   <table>
     <tr><th>Vendor</th><th class="num">Txns</th><th class="num">Spent</th></tr>
     {{range .Payees}}
-    <tr><td>{{.Payee}}</td><td class="num">{{.Count}}</td>
+    <tr><td><a href="/transactions?from={{$.From}}&to={{$.To}}&q={{.Payee | urlquery}}">{{.Payee}}</a></td><td class="num">{{.Count}}</td>
       <td class="num">{{money .Spent}}</td></tr>
     {{end}}
   </table>
