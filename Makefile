@@ -46,8 +46,8 @@ demo-gtk: gtk
 test:
 	go test ./...
 
-run:
-	go run ./cmd/minfin
+run: build
+	MINFIN_JWT_SECRET=testing ./bin/minfin
 
 fmt:
 	go fmt ./...
