@@ -24,7 +24,6 @@ echo "iOS AppIcon…"
 IOS="apple/minfin/Assets.xcassets/AppIcon.appiconset"
 mkdir -p "$IOS"
 "$CONVERT" "$SOURCE" -resize 1024x1024 "$IOS/Image.png"
-# ponytail: single 1024² universal icon — Xcode derives the device sizes.
 cat > "$IOS/Contents.json" <<'EOF'
 {
   "images" : [

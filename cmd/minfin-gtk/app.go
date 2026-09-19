@@ -173,6 +173,7 @@ func (a *App) addPages() {
 	add("transactions", "Transactions", "view-list-bullet-symbolic", a.buildTransactions)
 	add("categories", "Categories", "view-grid-symbolic", a.buildCategories)
 	add("spending", "Spending", "org.gnome.Settings-time-symbolic", a.buildSpending)
+	add("subscriptions", "Subscriptions", "view-refresh-symbolic", a.buildSubscriptions)
 	add("setup", "Setup", "emblem-system-symbolic", a.buildSetup)
 }
 
@@ -193,6 +194,14 @@ func (a *App) refreshPage(name string) {
 // clearing other filters (mirrors clicking a category in the web app).
 func (a *App) showCategoryTxns(category string) {
 	a.txn = txnState{category: category}
+	a.refreshPage("transactions")
+	a.stack.SetVisibleChildName("transactions")
+}
+
+// showPayeeTxns jumps to the Transactions page searching one payee over the
+// last year, clearing other filters.
+func (a *App) showPayeeTxns(payee string) {
+	a.txn = txnState{rangeKey: "last-12-months", query: payee}
 	a.refreshPage("transactions")
 	a.stack.SetVisibleChildName("transactions")
 }

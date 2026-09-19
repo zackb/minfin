@@ -9,8 +9,6 @@ import (
 
 // rateLimiter is a tiny fixed-window per-key limiter guarding the auth endpoints
 // against online password guessing. In-process only.
-// ponytail: fixed-window map+mutex, no dep. Ceiling: single-instance; a hosted
-// multi-replica deploy would move this to a shared store (Redis) or a proxy.
 type rateLimiter struct {
 	mu     sync.Mutex
 	hits   map[string]*window
@@ -61,9 +59,7 @@ func (l *rateLimiter) gc(now time.Time) {
 }
 
 // clientIP is the throttle key: the peer's IP. Behind a reverse proxy every
-// request shares the proxy's IP, so login throttling becomes global — a safe
-// (fail-closed) coarsening. ponytail: parse a trusted X-Forwarded-For here only
-// once a known proxy is in front, since XFF is client-spoofable otherwise.
+// request shares the proxy's IP, so login throttling becomes global.
 func clientIP(r *http.Request) string {
 	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		return host

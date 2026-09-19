@@ -120,6 +120,15 @@ using `pattern` (falling back to `payee`).
 Response: `{"series":{labels,ranges,lines},"payees":[…],"range","rangeLabel","interval","split"}`.
 `payees` are `PayeeStat` (`Payee, Count, Spent`).
 
+### Subscriptions
+
+`GET /api/subscriptions` — recurring debits detected over the last 13 months: same
+normalized payee, amounts within 10%, and a weekly/monthly/quarterly/yearly spacing.
+Mortgage, loan, utility, and insurance payments are left out, including any debit
+that lands as a matching credit on a Mortgage/Auto Loan/Loan account within 5 days.
+Response: `[{"payee","cadence","amount","monthly","count","last","next","active"}]`,
+active first, then by `monthly` descending. `monthly` is `amount` normalized to a month.
+
 ## Example
 
 ```sh

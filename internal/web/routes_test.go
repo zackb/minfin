@@ -18,6 +18,10 @@ func TestRoutes(t *testing.T) {
 	if rec := get(t, e, "/spending"); rec.Code != 200 {
 		t.Errorf("GET /spending = %d, want 200", rec.Code)
 	}
+	if rec := get(t, e, "/subscriptions"); rec.Code != 200 || !strings.Contains(rec.Body.String(), "Per Month") {
+		t.Errorf("GET /subscriptions = %d, want 200 with summary; body has Per Month: %v",
+			rec.Code, strings.Contains(rec.Body.String(), "Per Month"))
+	}
 	if rec := get(t, e, "/nonsense"); rec.Code != http.StatusNotFound {
 		t.Errorf("GET /nonsense = %d, want 404", rec.Code)
 	}

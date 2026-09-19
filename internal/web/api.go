@@ -50,6 +50,7 @@ func (s *Server) registerAPI() {
 	m.HandleFunc("DELETE /api/categories/rules/{id}", s.apiRuleDelete)
 
 	m.HandleFunc("GET /api/spending", s.apiSpending)
+	m.HandleFunc("GET /api/subscriptions", s.apiSubscriptions)
 }
 
 // helpers
@@ -530,4 +531,21 @@ func (s *Server) apiSpending(w http.ResponseWriter, r *http.Request) {
 	}
 	out["series"], out["payees"] = series, payees
 	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) apiSubscriptions(w http.ResponseWriter, r *http.Request) {
+	pid := portfolioID(r)
+	if pid == "" {
+		writeJSON(w, http.StatusOK, []store.Subscription{})
+		return
+	}
+	subs, err := s.store.Subscriptions(pid, time.Now())
+	if err != nil {
+		apiServerError(w, err)
+		return
+	}
+	if subs == nil {
+		subs = []store.Subscription{}
+	}
+	writeJSON(w, http.StatusOK, subs)
 }

@@ -1,0 +1,82 @@
+{{define "content"}}
+<h1>Subscriptions</h1>
+
+<div class="card">
+  <div class="hero">
+    <div>
+      <div class="muted">Per Month</div>
+      <div class="net neg">{{money .Monthly}}</div>
+    </div>
+    <div class="chip">
+      <div class="muted">Per Year</div>
+      <div class="big neg">{{money .Yearly}}</div>
+    </div>
+    <div class="chip">
+      <div class="muted">Active</div>
+      <div class="big">{{len .Current}}</div>
+    </div>
+  </div>
+</div>
+
+{{if .Current}}
+<div class="card chart-card">
+  <h2>Monthly Cost Share</h2>
+  <div class="chart-wrap"><canvas id="subChart"></canvas></div>
+</div>
+{{end}}
+
+<div class="card">
+  <h2>Active</h2>
+  {{if .Current}}{{template "subTable" .Current}}
+  {{else}}<p class="muted">No recurring charges found in the last 13 months.</p>{{end}}
+</div>
+
+{{if .Lapsed}}
+<div class="card">
+  <h2>Lapsed <span class="muted">· no charge since expected</span></h2>
+  {{template "subTable" .Lapsed}}
+</div>
+{{end}}
+
+<script>
+  (function () {
+    const data = {{.PieJSON}};
+    if (!data || !data.labels || !data.labels.length) return;
+    new Chart(document.getElementById('subChart'), {
+      type: 'doughnut',
+      data: {
+        labels: data.labels,
+        datasets: [{ data: data.values, backgroundColor: data.colors, borderWidth: 0 }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
+        onClick: (e, els) => {
+          if (!els.length) return;
+          window.location = `/transactions?from={{.From}}&q=${encodeURIComponent(data.labels[els[0].index])}`;
+        },
+        plugins: {
+          legend: { position: 'right', labels: { color: '#9aa0a6' } },
+          tooltip: { callbacks: { label: c => c.label + ': $' + c.parsed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '/mo' } },
+        },
+      },
+    });
+  })();
+</script>
+{{end}}
+
+{{define "subTable"}}
+<table>
+  <tr><th>Vendor</th><th>Cadence</th><th class="num">Amount</th><th>Last</th><th>Next</th><th class="num">Per Month</th></tr>
+  {{range .}}
+  <tr>
+    <td><a href="/transactions?from={{(.Last.AddDate -1 0 -30).Format "2006-01-02"}}&q={{.Payee | urlquery}}">{{.Payee}}</a> <span class="muted">×{{.Count}}</span></td>
+    <td>{{.Cadence}}</td>
+    <td class="num">{{money .Amount}}</td>
+    <td>{{.Last.Format "Jan 2, 2006"}}</td>
+    <td>{{.Next.Format "Jan 2, 2006"}}</td>
+    <td class="num">{{money .Monthly}}</td>
+  </tr>
+  {{end}}
+</table>
+{{end}}
