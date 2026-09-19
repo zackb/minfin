@@ -75,7 +75,6 @@ func bucketTo(startDate, interval, ce string) string {
 // SpendingSeries buckets debits (amount_cents<0, negated to positive spend) by
 // interval over [start,end). perAccount yields one line per account; otherwise a
 // single "Total" line.
-// ponytail: assumes one currency; group/convert if accounts mix.
 func (s *Store) SpendingSeries(portfolioID string, start, end time.Time, interval string, perAccount bool) (Series, error) {
 	bucket := bucketExpr(interval)
 	// Join categories so excluded categories (e.g. Transfer, Credit Card Payment)

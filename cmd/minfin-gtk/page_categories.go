@@ -75,7 +75,7 @@ func (a *App) catRangeBar(rangeKey string) gtk.Widgetter {
 // Clicking a slice, legend entry, or table row filters Transactions by category.
 func (a *App) categoryStatSection(title string, stats []store.CategoryStat, emptyMsg string) gtk.Widgetter {
 	box := vbox(8)
-	box.Append(a.pieCard(title, 260, stats))
+	box.Append(pieCard(title, 260, stats, a.showCategoryTxns))
 
 	grp := adw.NewPreferencesGroup()
 	if len(stats) == 0 {
@@ -105,16 +105,16 @@ func (a *App) categoryStatSection(title string, stats []store.CategoryStat, empt
 	return box
 }
 
-// pieCard is a chart card whose slices/legend rows navigate to the Transactions
-// page filtered to the clicked category (like the web app).
-func (a *App) pieCard(title string, height int, stats []store.CategoryStat) gtk.Widgetter {
+// pieCard is a chart card whose slices/legend rows call onClick with the
+// clicked slice's label (like the web app's click-through).
+func pieCard(title string, height int, stats []store.CategoryStat, onClick func(string)) gtk.Widgetter {
 	da := chartArea(height, func(cr *cairo.Context, w, h int, ink chartInk) {
 		drawPieChart(cr, w, h, stats, ink)
 	})
 	click := gtk.NewGestureClick()
 	click.ConnectReleased(func(_ int, x, y float64) {
 		if cat := pieSliceAt(x, y, da.Width(), da.Height(), stats); cat != "" {
-			a.showCategoryTxns(cat)
+			onClick(cat)
 		}
 	})
 	da.AddController(click)

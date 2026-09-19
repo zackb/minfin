@@ -184,7 +184,9 @@ func seedTxns() []txn {
 	}
 	for i, d := 0, 3; d <= 88; i, d = i+1, d+4 {
 		r := rest[i%len(rest)]
-		ts = append(ts, txn{"card", r.p, "Restaurants", r.a, d})
+		// Each repeat visit costs 15% more so the 32-day cycle doesn't read as a subscription.
+		amt := r.a * (1 + 0.15*float64(i/len(rest)))
+		ts = append(ts, txn{"card", r.p, "Restaurants", amt, d})
 	}
 	// Occasional shopping / health / entertainment / travel → card.
 	ts = append(ts,
@@ -195,7 +197,10 @@ func seedTxns() []txn {
 		txn{"card", "Dr. Smith Dental", "Health", -150.00, 52},
 		txn{"card", "Netflix", "Entertainment", -15.99, 10},
 		txn{"card", "Netflix", "Entertainment", -15.99, 40},
+		txn{"card", "Netflix", "Entertainment", -15.99, 70},
 		txn{"card", "Spotify", "Entertainment", -10.99, 22},
+		txn{"card", "Spotify", "Entertainment", -10.99, 52},
+		txn{"card", "Spotify", "Entertainment", -10.99, 82},
 		txn{"card", "AMC Theatres", "Entertainment", -38.50, 33},
 		txn{"card", "United Airlines", "Travel", -342.00, 28},
 		txn{"card", "Marriott Hotels", "Travel", -218.60, 27},

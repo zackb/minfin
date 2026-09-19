@@ -54,13 +54,14 @@ func NewServer(s *store.Store, a *auth.Service) *Server {
 		allowSignup:  os.Getenv("MINFIN_ALLOW_SIGNUP") != "",
 		loginLimiter: newRateLimiter(10, time.Minute),
 		pages: map[string]*template.Template{
-			"home":         page("home.html"),
-			"spending":     page("spending.html"),
-			"accounts":     page("accounts.html"),
-			"transactions": page("transactions.html"),
-			"categories":   page("categories.html"),
-			"login":        authPage("login.html"),
-			"signup":       authPage("signup.html"),
+			"home":          page("home.html"),
+			"spending":      page("spending.html"),
+			"subscriptions": page("subscriptions.html"),
+			"accounts":      page("accounts.html"),
+			"transactions":  page("transactions.html"),
+			"categories":    page("categories.html"),
+			"login":         authPage("login.html"),
+			"signup":        authPage("signup.html"),
 		},
 	}
 	srv.mux.Handle("/static/", http.FileServerFS(staticFS))
@@ -69,6 +70,7 @@ func NewServer(s *store.Store, a *auth.Service) *Server {
 	srv.mux.HandleFunc("/logout", srv.handleLogout)
 	srv.mux.HandleFunc("/", srv.handleHome)
 	srv.mux.HandleFunc("/spending", srv.handleSpending)
+	srv.mux.HandleFunc("/subscriptions", srv.handleSubscriptions)
 	srv.mux.HandleFunc("/accounts", srv.handleAccounts)
 	srv.mux.HandleFunc("/accounts/type", srv.handleAccountType)
 	srv.mux.HandleFunc("/accounts/nickname", srv.handleAccountNickname)
@@ -242,7 +244,7 @@ func authPage(name string) *template.Template {
 
 // viewBase carries fields the shared layout (sidebar) needs on every page.
 type viewBase struct {
-	Active    string // "spending" | "accounts" | "transactions" | "categories"
+	Active    string // "spending" | "subscriptions" | "accounts" | "transactions" | "categories"
 	Connected bool   // the active portfolio has a SimpleFIN token
 	Email     string // signed-in user, for the header/logout affordance
 	Error     string
@@ -380,7 +382,6 @@ func serverError(w http.ResponseWriter, context string, err error) {
 }
 
 // flash queues a one-shot message rendered as a toast on the next page load.
-// ponytail: cosmetic flash, no signing — app-authored and html-escaped on render.
 func flash(w http.ResponseWriter, msg string) {
 	http.SetCookie(w, &http.Cookie{Name: "minfin_flash", Value: url.QueryEscape(msg),
 		Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 30})
