@@ -1,8 +1,8 @@
 class Minfin < Formula
   desc "Personal finance app that syncs SimpleFIN accounts into local SQLite"
   homepage "https://github.com/zackb/minfin"
-  url "https://github.com/zackb/minfin/archive/refs/tags/v0.1.6.tar.gz"
-  sha256 "0100e18ba4639375fc79f8211834007a14cf476f2a7ba0be5f4e253f6b5f8df0"
+  url "https://github.com/zackb/minfin/archive/refs/tags/v0.1.7.tar.gz"
+  sha256 "73ee1a9b3e6a0f3dd9c0acacdb879d648cc9d5f55683205effe393b6a3a2e5da"
   license "MIT"
   head "https://github.com/zackb/minfin.git", branch: "main"
 
