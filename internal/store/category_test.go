@@ -247,3 +247,36 @@ func TestCategorySurvivesResync(t *testing.T) {
 		t.Fatalf("category after re-sync = %q, want Groceries", cat)
 	}
 }
+
+func TestCategoryPiesExcludeInvestmentAccounts(t *testing.T) {
+	s := seedStore(t)
+	if err := s.SaveAccountSet(testPID, simplefin.AccountSet{Accounts: []simplefin.Account{{
+		ID: "brk", Name: "Brokerage", Balance: "5000.00",
+		Transactions: []simplefin.Transaction{
+			{ID: "b1", Posted: at("2026-06-10T12:00:00Z"), Amount: "300.00", Payee: "Dividend"},
+			{ID: "b2", Posted: at("2026-06-11T12:00:00Z"), Amount: "-900.00", Payee: "Buy VTI"},
+		},
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetAccountType(testPID, "brk", "investment"); err != nil {
+		t.Fatal(err)
+	}
+	sum := func(stats []CategoryStat, err error) float64 {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var total float64
+		for _, st := range stats {
+			total += st.Amount
+		}
+		return total
+	}
+	if got := sum(s.SpendByCategory(testPID, rangeStart, rangeEnd)); got != 42.5 {
+		t.Fatalf("spend total = %v, want 42.5 (brokerage buy excluded)", got)
+	}
+	if got := sum(s.IncomeByCategory(testPID, rangeStart, rangeEnd)); got != 100 {
+		t.Fatalf("income total = %v, want 100 (dividend excluded)", got)
+	}
+}

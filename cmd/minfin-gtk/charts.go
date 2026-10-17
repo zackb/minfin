@@ -137,15 +137,15 @@ func drawLineChart(cr *cairo.Context, w, h int, s store.Series, ink chartInk) {
 	}
 
 	if len(s.Lines) > 1 {
-		drawLineLegend(cr, padL+8, padT+4, s.Lines, ink)
+		drawLineLegend(cr, padL+8, padT+4, s.Lines, lineColor, ink)
 	}
 }
 
-func drawLineLegend(cr *cairo.Context, x, y float64, lines []store.SpendLine, ink chartInk) {
+func drawLineLegend(cr *cairo.Context, x, y float64, lines []store.SpendLine, color func(int) (float64, float64, float64), ink chartInk) {
 	cr.SetFontSize(11)
 	for i, ln := range lines {
 		ly := y + float64(i)*16
-		r, g, b := lineColor(i)
+		r, g, b := color(i)
 		cr.SetSourceRGB(r, g, b)
 		cr.Rectangle(x, ly, 10, 10)
 		cr.Fill()
@@ -153,6 +153,77 @@ func drawLineLegend(cr *cairo.Context, x, y float64, lines []store.SpendLine, in
 		cr.MoveTo(x+16, ly+9)
 		cr.ShowText(ln.Name)
 	}
+}
+
+// barPalette colors cash-flow bars: income green, spending red.
+var barPalette = []string{"#66bb6a", "#ef5350"}
+
+func barColor(i int) (float64, float64, float64) { return hexRGB(barPalette[i%len(barPalette)]) }
+
+// drawBarChart plots a series as grouped bars: one group per bucket, one bar per line.
+func drawBarChart(cr *cairo.Context, w, h int, s store.Series, ink chartInk) {
+	W, H := float64(w), float64(h)
+	cr.SelectFontFace("sans-serif", cairo.FontSlantNormal, cairo.FontWeightNormal)
+	cr.SetFontSize(11)
+
+	max := 0.0
+	for _, ln := range s.Lines {
+		for _, v := range ln.Values {
+			max = math.Max(max, v)
+		}
+	}
+	if len(s.Labels) == 0 || len(s.Lines) == 0 || max <= 0 {
+		drawNoData(cr, W, H, ink)
+		return
+	}
+	max = niceCeil(max)
+
+	padL, padR, padT, padB := 56.0, 12.0, 12.0, 28.0
+	plotW, plotH := W-padL-padR, H-padT-padB
+	if plotW < 20 || plotH < 20 {
+		return
+	}
+	groupW := plotW / float64(len(s.Labels))
+	barW := groupW * 0.8 / float64(len(s.Lines))
+	y := func(v float64) float64 { return padT + plotH*(1-v/max) }
+
+	cr.SetLineWidth(1)
+	for i := 0; i <= 4; i++ {
+		val := max * float64(i) / 4
+		yy := y(val)
+		cr.SetSourceRGBA(ink.r, ink.g, ink.b, 0.12)
+		cr.MoveTo(padL, yy)
+		cr.LineTo(W-padR, yy)
+		cr.Stroke()
+		cr.SetSourceRGBA(ink.r, ink.g, ink.b, 0.7)
+		lbl := shortUSD(val)
+		te := cr.TextExtents(lbl)
+		cr.MoveTo(padL-8-te.Width, yy+te.Height/2)
+		cr.ShowText(lbl)
+	}
+
+	step := 1
+	if len(s.Labels) > 8 {
+		step = (len(s.Labels) + 7) / 8
+	}
+	cr.SetSourceRGBA(ink.r, ink.g, ink.b, 0.7)
+	for i := 0; i < len(s.Labels); i += step {
+		te := cr.TextExtents(s.Labels[i])
+		cr.MoveTo(padL+groupW*(float64(i)+0.5)-te.Width/2, H-padB+16)
+		cr.ShowText(s.Labels[i])
+	}
+
+	for li, ln := range s.Lines {
+		r, g, b := barColor(li)
+		cr.SetSourceRGB(r, g, b)
+		for i, v := range ln.Values {
+			x := padL + groupW*float64(i) + groupW*0.1 + barW*float64(li)
+			cr.Rectangle(x, y(v), barW, y(0)-y(v))
+		}
+		cr.Fill()
+	}
+
+	drawLineLegend(cr, padL+8, padT+4, s.Lines, barColor, ink)
 }
 
 // drawPieChart draws category amounts as a pie with a legend to its right.

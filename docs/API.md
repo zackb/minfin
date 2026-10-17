@@ -118,7 +118,14 @@ using `pattern` (falling back to `payee`).
 | `split` | `1` for one line per account | off |
 
 Response: `{"series":{labels,ranges,lines},"payees":[…],"range","rangeLabel","interval","split"}`.
-`payees` are `PayeeStat` (`Payee, Count, Spent`).
+`payees` are `PayeeStat` (`Payee, Count, Spent`). Investment accounts are left out.
+
+`GET /api/cashflow` — income vs spending per bucket. Params: `range` (default
+`last-12-months`, also `all-time`), `interval` `monthly` \| `quarterly` \| `yearly`
+(default `monthly`). Excluded categories, inflows on liability accounts, and all
+investment-account activity are left out.
+Response: `{"cashflow":{labels,ranges,lines,income,spending,net,savingsRate},"range","rangeLabel","interval"}`;
+`lines` is `[Income, Spending]`, `savingsRate` is `net/income` (0 with no income).
 
 ### Subscriptions
 

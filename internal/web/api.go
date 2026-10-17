@@ -50,6 +50,7 @@ func (s *Server) registerAPI() {
 	m.HandleFunc("DELETE /api/categories/rules/{id}", s.apiRuleDelete)
 
 	m.HandleFunc("GET /api/spending", s.apiSpending)
+	m.HandleFunc("GET /api/cashflow", s.apiCashFlow)
 	m.HandleFunc("GET /api/subscriptions", s.apiSubscriptions)
 }
 
@@ -530,6 +531,32 @@ func (s *Server) apiSpending(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out["series"], out["payees"] = series, payees
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) apiCashFlow(w http.ResponseWriter, r *http.Request) {
+	pid := portfolioID(r)
+	q := r.URL.Query()
+	rng := orDefault(q.Get("range"), "last-12-months")
+	interval := orDefault(q.Get("interval"), "monthly")
+
+	out := map[string]any{
+		"range":      rng,
+		"rangeLabel": daterange.Label(rng),
+		"interval":   interval,
+	}
+	if pid == "" {
+		out["cashflow"] = store.CashFlow{}
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
+	start, end := daterange.Resolve(rng, time.Now())
+	cf, err := s.store.CashFlow(pid, start, end, interval)
+	if err != nil {
+		apiServerError(w, err)
+		return
+	}
+	out["cashflow"] = cf
 	writeJSON(w, http.StatusOK, out)
 }
 

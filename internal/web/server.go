@@ -56,6 +56,7 @@ func NewServer(s *store.Store, a *auth.Service) *Server {
 		pages: map[string]*template.Template{
 			"home":          page("home.html"),
 			"spending":      page("spending.html"),
+			"cashflow":      page("cashflow.html"),
 			"subscriptions": page("subscriptions.html"),
 			"accounts":      page("accounts.html"),
 			"transactions":  page("transactions.html"),
@@ -70,6 +71,7 @@ func NewServer(s *store.Store, a *auth.Service) *Server {
 	srv.mux.HandleFunc("/logout", srv.handleLogout)
 	srv.mux.HandleFunc("/", srv.handleHome)
 	srv.mux.HandleFunc("/spending", srv.handleSpending)
+	srv.mux.HandleFunc("/cashflow", srv.handleCashFlow)
 	srv.mux.HandleFunc("/subscriptions", srv.handleSubscriptions)
 	srv.mux.HandleFunc("/accounts", srv.handleAccounts)
 	srv.mux.HandleFunc("/accounts/type", srv.handleAccountType)
@@ -244,7 +246,7 @@ func authPage(name string) *template.Template {
 
 // viewBase carries fields the shared layout (sidebar) needs on every page.
 type viewBase struct {
-	Active    string // "spending" | "subscriptions" | "accounts" | "transactions" | "categories"
+	Active    string // "spending" | "cashflow" | "subscriptions" | "accounts" | "transactions" | "categories"
 	Connected bool   // the active portfolio has a SimpleFIN token
 	Email     string // signed-in user, for the header/logout affordance
 	Error     string

@@ -17,9 +17,13 @@ var Options = []Option{
 	{"last-90-days", "Last 90 Days"},
 	{"this-year", "This Year"},
 	{"last-12-months", "Last 12 Months"},
+	{"all-time", "All Time"},
 }
 
 var Intervals = []string{"daily", "weekly", "monthly"}
+
+// CashFlowIntervals are the coarser buckets offered on the Cash Flow screen.
+var CashFlowIntervals = []string{"monthly", "quarterly", "yearly"}
 
 // Resolve returns [start, end) for a named preset. Weeks start Monday.
 // Unknown names fall back to last-30-days. now is injectable for testing.
@@ -50,6 +54,8 @@ func Resolve(name string, now time.Time) (time.Time, time.Time) {
 		return time.Date(y, 1, 1, 0, 0, 0, 0, loc), tomorrow
 	case "last-12-months":
 		return today.AddDate(-1, 0, 0), tomorrow
+	case "all-time":
+		return time.Date(1970, 1, 1, 0, 0, 0, 0, loc), tomorrow
 	case "last-30-days":
 	}
 	return today.AddDate(0, 0, -29), tomorrow // default

@@ -1,0 +1,91 @@
+{{define "content"}}
+<h1>Cash Flow</h1>
+
+<div class="card">
+  <div class="hero">
+    <div>
+      <div class="muted">Net</div>
+      <div class="net {{if lt .CashFlow.Net 0.0}}neg{{else}}pos{{end}}">{{money .CashFlow.Net}}</div>
+    </div>
+    <div class="chip">
+      <div class="muted">Income</div>
+      <div class="big pos">{{money .CashFlow.Income}}</div>
+    </div>
+    <div class="chip">
+      <div class="muted">Spending</div>
+      <div class="big neg">{{money .CashFlow.Spending}}</div>
+    </div>
+    <div class="chip">
+      <div class="muted">Savings Rate</div>
+      <div class="big {{if lt .CashFlow.SavingsRate 0.0}}neg{{else}}pos{{end}}">{{or .SavingsPct "—"}}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card chart-card">
+  <form method="get" action="/cashflow" class="controls">
+    <select name="range" onchange="this.form.submit()">
+      {{$r := .Range}}{{range .RangeOptions}}
+      <option value="{{.Key}}" {{if eq .Key $r}}selected{{end}}>{{.Label}}</option>
+      {{end}}
+    </select>
+    <select name="interval" onchange="this.form.submit()">
+      {{$i := .Interval}}{{range .IntervalOptions}}
+      <option value="{{.}}" {{if eq . $i}}selected{{end}}>{{.}}</option>
+      {{end}}
+    </select>
+  </form>
+  <div class="chart-wrap"><canvas id="chart"></canvas></div>
+</div>
+
+<div class="card">
+  <h2>By Period</h2>
+  {{if .Rows}}
+  <table>
+    <tr><th>Period</th><th class="num">Income</th><th class="num">Spending</th><th class="num">Net</th></tr>
+    {{range .Rows}}
+    <tr><td><a href="/transactions?from={{.From}}&to={{.To}}">{{.Label}}</a></td>
+      <td class="num pos">{{money .Income}}</td>
+      <td class="num neg">{{money .Spending}}</td>
+      <td class="num {{if lt .Net 0.0}}neg{{else}}pos{{end}}">{{money .Net}}</td></tr>
+    {{end}}
+  </table>
+  {{else}}<p class="muted">No activity in this range.</p>{{end}}
+</div>
+
+<script>
+  const series = {{.ChartJSON}} || { labels: [], ranges: [], lines: [{ values: [] }, { values: [] }] };
+  const [income, spend] = series.lines;
+  const net = income.values.map((v, i) => v - spend.values[i]);
+  const usd = v => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  new Chart(document.getElementById('chart'), {
+    data: {
+      labels: series.labels,
+      datasets: [
+        { type: 'line', label: 'Net', data: net, borderColor: '#26c6da', backgroundColor: '#26c6da',
+          borderWidth: 2, tension: .35, pointRadius: 3, order: 0 },
+        { type: 'bar', label: 'Income', data: income.values, backgroundColor: '#66bb6acc', borderRadius: 3, order: 1 },
+        { type: 'bar', label: 'Spending', data: spend.values, backgroundColor: '#ef5350cc', borderRadius: 3, order: 1 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      onClick: (e, els) => {
+        if (!els.length) return;
+        const r = series.ranges[els[0].index];
+        if (r) window.location = `/transactions?from=${r.from}&to=${r.to}`;
+      },
+      onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
+      plugins: {
+        legend: { labels: { color: '#9aa0a6' } },
+        tooltip: { callbacks: { label: c => c.dataset.label + ': ' + usd(c.parsed.y) } },
+      },
+      scales: {
+        x: { grid: { color: '#2a2a2a' }, ticks: { color: '#9aa0a6', maxRotation: 0, autoSkip: true } },
+        y: { grid: { color: '#2a2a2a' }, ticks: { color: '#9aa0a6', callback: v => '$' + v.toLocaleString('en-US') } },
+      },
+    },
+  });
+</script>
+{{end}}

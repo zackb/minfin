@@ -29,6 +29,7 @@ type App struct {
 
 	txn   txnState   // transactions page filters, persisted across refreshes
 	spend spendState // spending page controls, persisted across refreshes
+	cash  cashState  // cash flow page controls, persisted across refreshes
 	cat   catState   // categories page date range, persisted across refreshes
 }
 
@@ -43,6 +44,12 @@ type spendState struct {
 	rangeKey   string // daterange preset; "" => last 30 days
 	interval   string // "daily" | "weekly" | "monthly"; "" => daily
 	perAccount bool   // one line per account vs a single Total
+}
+
+// cashState is the cash flow page's range/interval controls.
+type cashState struct {
+	rangeKey string // daterange preset; "" => last 12 months
+	interval string // "monthly" | "quarterly" | "yearly"; "" => monthly
 }
 
 // txnState is the transactions page's current filter + page. It lives on App so
@@ -173,6 +180,7 @@ func (a *App) addPages() {
 	add("transactions", "Transactions", "view-list-bullet-symbolic", a.buildTransactions)
 	add("categories", "Categories", "view-grid-symbolic", a.buildCategories)
 	add("spending", "Spending", "org.gnome.Settings-time-symbolic", a.buildSpending)
+	add("cashflow", "Cash Flow", "power-profile-balanced-symbolic", a.buildCashFlow)
 	add("subscriptions", "Subscriptions", "view-refresh-symbolic", a.buildSubscriptions)
 	add("setup", "Setup", "emblem-system-symbolic", a.buildSetup)
 }

@@ -248,12 +248,13 @@ func (s *Store) ApplyRules(portfolioID string, overwrite bool) (int, error) {
 }
 
 // SpendByCategory aggregates debit spend (amount<0) by category over [start,end),
-// excluding categories flagged exclude. Empty categories bucket as "Uncategorized".
+// excluding categories flagged exclude and investment accounts. Empty categories bucket as "Uncategorized".
 func (s *Store) SpendByCategory(portfolioID string, start, end time.Time) ([]CategoryStat, error) {
 	return s.byCategory(portfolioID, start, end, "t.amount_cents < 0", "-SUM(t.amount_cents)")
 }
 
-// IncomeByCategory aggregates credit income (amount>0) by category over [start,end).
+// IncomeByCategory aggregates credit income (amount>0) by category over
+// [start,end), excluding liability and investment accounts.
 func (s *Store) IncomeByCategory(portfolioID string, start, end time.Time) ([]CategoryStat, error) {
 	return s.byCategory(portfolioID, start, end, "t.amount_cents > 0 AND "+liabilityExcludeSQL(), "SUM(t.amount_cents)")
 }
@@ -267,7 +268,7 @@ func (s *Store) byCategory(portfolioID string, start, end time.Time, sign, sum s
 		      LEFT JOIN accounts a ON a.portfolio_id = t.portfolio_id AND a.id = t.account_id
 		      LEFT JOIN categories c ON c.portfolio_id = t.portfolio_id AND c.name = t.category
 		 WHERE t.portfolio_id = ? AND t.posted >= ? AND t.posted < ? AND `+sign+`
-		       AND COALESCE(c.exclude, 0) = 0
+		       AND COALESCE(c.exclude, 0) = 0 AND `+notInvestmentSQL+`
 		 GROUP BY cat
 		 ORDER BY amt DESC`, portfolioID, start.Unix(), end.Unix())
 	if err != nil {

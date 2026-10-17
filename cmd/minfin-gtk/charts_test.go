@@ -85,3 +85,16 @@ func TestNiceCeil(t *testing.T) {
 		}
 	}
 }
+
+func TestDrawBarChart(t *testing.T) {
+	ink := chartInk{0.2, 0.2, 0.2}
+	series := store.Series{
+		Labels: []string{"2026-Q1", "2026-Q2"},
+		Lines: []store.SpendLine{
+			{Name: "Income", Values: []float64{5000, 6200}},
+			{Name: "Spending", Values: []float64{4100, 0}},
+		},
+	}
+	renderCheck(t, func(cr *cairo.Context, w, h int) { drawBarChart(cr, w, h, series, ink) })
+	renderCheck(t, func(cr *cairo.Context, w, h int) { drawBarChart(cr, w, h, store.Series{}, ink) })
+}

@@ -159,6 +159,37 @@ func TestTopPayees(t *testing.T) {
 	}
 }
 
+func TestSpendingExcludesInvestmentAccounts(t *testing.T) {
+	s := seedStore(t)
+	if err := s.SaveAccountSet(testPID, simplefin.AccountSet{Accounts: []simplefin.Account{{
+		ID: "brk", Name: "Brokerage", Balance: "5000.00",
+		Transactions: []simplefin.Transaction{
+			{ID: "b1", Posted: at("2026-06-11T12:00:00Z"), Amount: "-900.00", Payee: "Buy VTI"},
+		},
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetAccountType(testPID, "brk", "investment"); err != nil {
+		t.Fatal(err)
+	}
+	series, err := s.SpendingSeries(testPID, rangeStart, rangeEnd, "daily", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ln := range series.Lines {
+		if ln.Name == "Brokerage" {
+			t.Fatalf("investment account in spending lines: %+v", series.Lines)
+		}
+	}
+	p, err := s.TopPayees(testPID, rangeStart, rangeEnd, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p) != 2 || p[0].Payee != "Coffee" {
+		t.Fatalf("top payees = %+v, want Coffee, Grocer only", p)
+	}
+}
+
 func TestAccounts(t *testing.T) {
 	s := seedStore(t)
 	now := time.Date(2026, 6, 12, 0, 0, 0, 0, time.UTC)
@@ -172,5 +203,67 @@ func TestAccounts(t *testing.T) {
 	}
 	if accts[0].Spent30 != 35 { // 10+5+20
 		t.Fatalf("Checking Spent30 = %v, want 35", accts[0].Spent30)
+	}
+}
+
+func TestCashFlow(t *testing.T) {
+	s := seedStore(t)
+	if err := s.SaveAccountSet(testPID, simplefin.AccountSet{Accounts: []simplefin.Account{{
+		ID: "loan1", Name: "Auto Loan", Balance: "-20000.00",
+		Transactions: []simplefin.Transaction{
+			{ID: "p1", Posted: at("2026-06-10T12:00:00Z"), Amount: "400.00", Payee: "Car Payment"},
+		},
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetAccountType(testPID, "loan1", "auto_loan"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveAccountSet(testPID, simplefin.AccountSet{Accounts: []simplefin.Account{{
+		ID: "brk", Name: "Brokerage", Balance: "5000.00",
+		Transactions: []simplefin.Transaction{
+			{ID: "b1", Posted: at("2026-06-10T12:00:00Z"), Amount: "300.00", Payee: "Dividend"},
+			{ID: "b2", Posted: at("2026-06-11T12:00:00Z"), Amount: "-900.00", Payee: "Buy VTI"},
+		},
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetAccountType(testPID, "brk", "investment"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetTxnCategory(testPID, "t3", "Transfer"); err != nil { // drops Grocer $20
+		t.Fatal(err)
+	}
+
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	cf, err := s.CashFlow(testPID, start, end, "quarterly")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cf.Labels) != 1 || cf.Labels[0] != "2026-Q2" {
+		t.Fatalf("labels = %v, want [2026-Q2]", cf.Labels)
+	}
+	if cf.Ranges[0] != (Bucket{"2026-04-01", "2026-06-30"}) {
+		t.Fatalf("ranges = %+v", cf.Ranges)
+	}
+	// Income: Paycheck 100 + Interest 50 (loan 400, brokerage excluded). Spend: coffee 22.50.
+	if cf.Income != 150 || cf.Spending != 22.5 || cf.Net != 127.5 {
+		t.Fatalf("totals = %v/%v/%v, want 150/22.5/127.5", cf.Income, cf.Spending, cf.Net)
+	}
+	if cf.Lines[0].Values[0] != 150 || cf.Lines[1].Values[0] != 22.5 {
+		t.Fatalf("lines = %+v", cf.Lines)
+	}
+	if cf.SavingsRate != 0.85 {
+		t.Fatalf("savings rate = %v, want 0.85", cf.SavingsRate)
+	}
+
+	// Yearly bucket clamps to the window.
+	cf, err = s.CashFlow(testPID, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC), "yearly")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cf.Labels) != 1 || cf.Labels[0] != "2026" || cf.Ranges[0] != (Bucket{"2026-06-01", "2026-06-14"}) {
+		t.Fatalf("yearly = %v %+v", cf.Labels, cf.Ranges)
 	}
 }

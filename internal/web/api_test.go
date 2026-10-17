@@ -43,6 +43,11 @@ func TestAPIAuthAndIsolation(t *testing.T) {
 		t.Fatalf("owner sees %d accounts, want 1", n)
 	}
 
+	rec = apiReq(t, e, http.MethodGet, "/api/cashflow?interval=yearly", token, "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"savingsRate"`) {
+		t.Fatalf("GET /api/cashflow = %d, body=%s; want 200 with savingsRate", rec.Code, rec.Body.String())
+	}
+
 	// No token -> 401 JSON (not a redirect).
 	rec = apiReq(t, e, http.MethodGet, "/api/accounts", "", "")
 	if rec.Code != http.StatusUnauthorized {
